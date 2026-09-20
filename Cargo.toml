@@ -27,3 +27,10 @@ iced = { version = "0.14", default-features = false, features = [
     "x11",
     "wayland",
 ] }
+# 站外链接交给系统浏览器 / 默认程序
+url = "2.5.8"
+opener = "0.8.5"
+
+# 站点身份校验：HTTP 请求 + sha256 签名
+ureq = "3.4.2"
+sha2 = "0.10"
