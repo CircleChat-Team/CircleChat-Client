@@ -43,6 +43,11 @@ download "https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/downloa
 download "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${ARCH}.AppImage" \
          "$TOOLS/appimagetool"
 
+# linuxdeploy 的 --output appimage 会自己调用 appimagetool，而 --plugin gtk 也要能在 PATH 里
+# 找到 linuxdeploy-plugin-gtk；把它们所在的目录加进 PATH，否则 linuxdeploy 生成步骤会静默失败、
+# 不产出 .AppImage，导致后面 `mv ./*.AppImage` 直接报错。
+export PATH="$TOOLS:$PATH"
+
 mkdir -p "$WORK/AppDir"
 
 # linuxdeploy 用 VERSION 决定 AppImage 的文件名
@@ -61,6 +66,13 @@ mkdir -p "$OUT_DIR"
 OUTPUT="$OUT_DIR/CircleChat-${VERSION}-${ARCH}.AppImage"
 
 # 上面那步会在当前目录产出 *.AppImage，统一改名搬到输出目录
-mv ./*.AppImage "$OUTPUT"
+shopt -s nullglob
+appimages=( ./*.AppImage )
+shopt -u nullglob
+if [[ ${#appimages[@]} -eq 0 ]]; then
+  echo "错误：linuxdeploy 没有产出任何 .AppImage，打包失败" >&2
+  exit 1
+fi
+mv "${appimages[0]}" "$OUTPUT"
 chmod +x "$OUTPUT"
 echo "已生成：$OUTPUT"
