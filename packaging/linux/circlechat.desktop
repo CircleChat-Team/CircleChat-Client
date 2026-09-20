@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CircleChat
+GenericName=Instant Messenger
+Comment=CircleChat 桌面客户端
+Exec=circlechat-client
+Icon=circlechat
+Terminal=false
+Categories=Network;InstantMessaging;
+Keywords=chat;im;circlechat;
+StartupWMClass=CircleChat

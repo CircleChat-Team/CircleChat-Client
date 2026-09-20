@@ -30,7 +30,8 @@ if [[ ! -f "$ICON" ]]; then
     exit 1
 fi
 
-VERSION="$(sed -n 's/^version *= *"\(.*\)"/\1/p' "$ROOT/Cargo.toml" | head -1)"
+# 版本号：CI 里用 CIRCLECHAT_VERSION 传入（`0.1.0+<sha>`），本地就从 Cargo.toml 读
+VERSION="${CIRCLECHAT_VERSION:-$(sed -n 's/^version *= *"\(.*\)"/\1/p' "$ROOT/Cargo.toml" | head -1)}"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -74,3 +75,11 @@ PLIST
 echo "已生成：$APP"
 echo "  可执行文件：$APP/Contents/MacOS/CircleChat"
 echo "  图标：      $APP/Contents/Resources/AppIcon.icns"
+
+# CIRCLECHAT_DMG=1 时再打个 dmg（分发用，.app 直接拷会丢权限/签名信息）
+if [[ "${CIRCLECHAT_DMG:-0}" == "1" ]]; then
+    DMG="$ROOT/target/macos/CircleChat-${VERSION}.dmg"
+    rm -f "$DMG"
+    hdiutil create -volname "CircleChat" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
+    echo "已生成：$DMG"
+fi

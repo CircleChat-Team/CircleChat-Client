@@ -11,6 +11,8 @@
 use wry::http::header::{CACHE_CONTROL, PRAGMA};
 use wry::http::{HeaderMap, HeaderName, HeaderValue};
 
+use crate::app;
+
 /// 注入到页面里的客户端标记名（挂在 window 上）。
 const CLIENT_MARKER: &str = "__CIRCLECHAT_CLIENT__";
 /// 客户端标识，前端与（入口请求的）服务端都用这个名字认。
@@ -22,8 +24,9 @@ const CLIENT_HEADER: &str = "x-circlechat-client";
 /// 允许用环境变量整体覆盖 UA，用来在不重新发版的情况下修 UA 相关的问题。
 const USER_AGENT_ENV: &str = "CIRCLECHAT_USER_AGENT";
 
-pub(crate) fn client_version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
+/// 客户端版本（`0.1.0+<构建号>`），构建号是 CI 注入的 git short sha。
+pub(crate) fn client_version() -> String {
+    app::version()
 }
 
 /// 给前端的客户端标记：在页面自身脚本执行之前注入，所有路由 / 刷新都在。
@@ -98,7 +101,8 @@ pub(crate) fn entry_request_headers() -> HeaderMap {
     headers.insert(PRAGMA, HeaderValue::from_static("no-cache"));
     headers.insert(
         HeaderName::from_static(CLIENT_HEADER),
-        HeaderValue::from_static(client_version()),
+        HeaderValue::from_str(&client_version())
+            .unwrap_or_else(|_| HeaderValue::from_static("unknown")),
     );
     headers
 }
@@ -114,7 +118,7 @@ mod tests {
 
         assert!(script.contains(CLIENT_MARKER));
         assert!(script.contains(CLIENT_NAME));
-        assert!(script.contains(client_version()));
+        assert!(script.contains(&client_version()));
         assert!(script.contains(std::env::consts::OS));
         assert!(script.contains("Object.freeze"), "标记应该是冻结对象");
     }
@@ -134,7 +138,7 @@ mod tests {
         assert!(headers.get(CACHE_CONTROL).is_some());
         assert_eq!(
             headers.get(CLIENT_HEADER).map(|value| value.to_str().unwrap()),
-            Some(client_version())
+            Some(client_version().as_str())
         );
     }
 }

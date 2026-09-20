@@ -219,6 +219,56 @@ Windows 不需要额外步骤，`build.rs` 在 Windows 宿主机上构建时会�
 
 ---
 
+## CI 与发布
+
+两条流水线，目的是**平时的提交不产生版本**：
+
+| 流水线 | 触发时机 | 做什么 |
+|---|---|---|
+| `.github/workflows/ci.yml` | push / PR，且改动涉及代码（`src/**`、`Cargo.*`、`build.rs`、`assets/**`） | 三个平台编译 + `cargo test`，**不产出、不发布** |
+| `.github/workflows/release.yml` | ① 推送 `v*` tag ② 手动 Run workflow | 构建多平台安装包，创建 GitHub Release 并附上产物 |
+
+### 发正式版
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+### 按某个提交发版（sha 作版本号）
+
+网页上 Actions → Release → Run workflow，填：
+
+- `ref`：要构建的 commit sha（留空用当前 HEAD）
+- `prerelease`：默认勾上
+
+或者命令行：
+
+```bash
+gh workflow run release.yml -f ref=$(git rev-parse --short HEAD) -f prerelease=true
+```
+
+会创建一个 `sha-<短sha>` 标签的预发布版本。
+
+### 产物
+
+| 平台 | 产物 |
+|---|---|
+| Linux | `.deb`、`.rpm`、`.AppImage` |
+| Windows | `circlechat-<版本>-windows-x86_64.zip`（含 exe，图标已由 `build.rs` 嵌入） |
+| macOS | `CircleChat-<版本>.dmg`（内含 `.app`，图标来自 `assets/icon.icns`） |
+
+### 构建号
+
+CI 通过环境变量 `CIRCLECHAT_BUILD` 把 git short sha 编进二进制，本地构建时 `build.rs` 会自己去问 git。所以客户端对外报的版本是 `0.1.0+<sha>`，UA 和 `window.__CIRCLECHAT_CLIENT__.version` 里都能看到。
+
+```bash
+CIRCLECHAT_BUILD=$(git rev-parse --short HEAD) cargo build --release
+```
+
+> macOS 的 `.app` 和 Windows 的 exe **没有签名**：macOS 上首次打开会被 Gatekeeper 拦（右键 → 打开），Windows 可能弹 SmartScreen。要正式分发的话，还需要配开发者证书并在 workflow 里加签名/公证步骤。
+
+---
+
 ## 测试
 
 ```bash

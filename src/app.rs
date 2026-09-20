@@ -16,7 +16,21 @@ const APP_NAME: &str = "CircleChat";
 /// 展示给用户的应用名（窗口标题、系统通知里的应用名）。
 pub(crate) const APP_DISPLAY_NAME: &str = "CircleChat";
 
+/// 构建号：CI 注入的 git short sha（build.rs 生成，本地是 git sha 或 "dev"）。
+pub(crate) const BUILD_ID: &str = env!("CIRCLECHAT_BUILD");
+
 const CONFIG_FILE_NAME: &str = "config.json";
+
+/// 展示用的版本号，形如 `0.1.0+abc1234`。
+pub(crate) fn version() -> String {
+    let package = env!("CARGO_PKG_VERSION");
+
+    if BUILD_ID.is_empty() || BUILD_ID == "dev" {
+        package.to_string()
+    } else {
+        format!("{package}+{BUILD_ID}")
+    }
+}
 
 /// 配置文件路径：优先用 `ProjectDirs`，拿不到时退回 `BaseDirs`，再退回当前目录。
 pub(crate) fn config_path() -> PathBuf {
