@@ -1,0 +1,29 @@
+[package]
+name = "circlechat-client"
+version = "0.1.0"
+edition = "2024"
+description = "CircleChat 桌面客户端（wry WebView 外壳）"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# WebView 外壳
+wry = "0.57"
+# 窗口 / 事件循环（wry 不再自带窗口层，需要自己引入）
+tao = "0.37"
+
+# 本地 JSON 配置
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 系统标准目录（配置目录）
+directories = "6"
+
+# 配置窗口：纯 Rust GUI（不依赖 HTML）。
+# 关闭默认特性是为了避免引入 wgpu，改用 tiny-skia 软件渲染，编译更快、兼容性更好。
+iced = { version = "0.14", default-features = false, features = [
+    "tiny-skia",
+    "crisp",
+    "thread-pool",
+    "x11",
+    "wayland",
+] }
