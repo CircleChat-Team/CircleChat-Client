@@ -56,6 +56,38 @@ APP_SECRET='你的密钥' cargo run
 
 ---
 
+## 启动
+
+```bash
+# 调试运行（首次会弹配置窗口）
+APP_SECRET='你的密钥' cargo run
+
+# 或者先构建再直接跑二进制
+cargo build --release
+APP_SECRET='你的密钥' ./target/release/circlechat-client
+```
+
+**首次启动**（配置文件里还没有地址）：
+
+1. 弹出「CircleChat 配置」窗口
+2. 填服务地址，点「保存并进入」
+3. 客户端去拉 `{地址}/api/app-manifest` 校验站点身份 —— 通过才写入配置并打开 WebView，失败则在窗口里提示「无效的站点」
+
+**之后再启动**：配置里已有地址，直接打开 WebView，不再弹配置窗口。这种情况**可以不用传 `APP_SECRET`**（校验只发生在保存地址那一刻）。
+
+**回到配置窗口**，两种方式：
+
+- 在 WebView 里按 `Ctrl+Shift+R`（macOS 为 `Cmd+Shift+R`）—— 会清掉配置并重启客户端
+- 直接删掉配置文件再启动
+
+日志（配置路径、缓存目录、UA、下载、通知）都打到 stdout，需要留档就：
+
+```bash
+APP_SECRET='你的密钥' cargo run 2>&1 | tee run.log
+```
+
+---
+
 ## 站点身份校验
 
 保存地址前，客户端会 GET `{地址}/api/app-manifest`，期望：
