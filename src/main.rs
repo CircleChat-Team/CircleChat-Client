@@ -271,6 +271,99 @@ fn fetch_manifest(url: &str) -> Result<AppManifest, String> {
 }
 
 // ---------------------------------------------------------------------------
+// 应用图标
+// ---------------------------------------------------------------------------
+
+/// 内置的应用图标。
+///
+/// 由 `assets/logo.svg` 生成：`python3 packaging/icons/build-icons.py`
+/// （同时产出 `icon.png` 运行时用、`icon.ico` Windows 用、`icon.icns` macOS 用）。
+const APP_ICON_PNG: &[u8] = include_bytes!("../assets/icon.png");
+
+/// 解出 PNG 的 RGBA 像素（tao 和 iced 的窗口图标都要 RGBA）。
+fn decode_icon_png(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
+    let decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+    let mut reader = decoder
+        .read_info()
+        .map_err(|err| format!("读取图标失败：{err}"))?;
+
+    let buffer_size = reader
+        .output_buffer_size()
+        .ok_or_else(|| "图标尺寸超出解码上限".to_string())?;
+    let mut buffer = vec![0; buffer_size];
+    let info = reader
+        .next_frame(&mut buffer)
+        .map_err(|err| format!("解码图标失败：{err}"))?;
+
+    if info.bit_depth != png::BitDepth::Eight {
+        return Err(format!("图标位深不支持：{:?}", info.bit_depth));
+    }
+
+    let rgba = match info.color_type {
+        png::ColorType::Rgba => buffer[..info.buffer_size()].to_vec(),
+        png::ColorType::Rgb => buffer[..info.buffer_size()]
+            .chunks_exact(3)
+            .flat_map(|pixel| [pixel[0], pixel[1], pixel[2], 255])
+            .collect(),
+        other => return Err(format!("图标颜色类型不支持：{other:?}")),
+    };
+
+    Ok((rgba, info.width, info.height))
+}
+
+/// 主窗口图标（tao）。
+fn window_icon() -> Option<tao::window::Icon> {
+    match decode_icon_png(APP_ICON_PNG).and_then(|(rgba, width, height)| {
+        tao::window::Icon::from_rgba(rgba, width, height).map_err(|err| err.to_string())
+    }) {
+        Ok(icon) => Some(icon),
+        Err(err) => {
+            eprintln!("加载窗口图标失败：{err}");
+            None
+        }
+    }
+}
+
+/// 配置窗口图标（iced 自己的 Icon 类型）。
+fn config_window_icon() -> Option<iced::window::Icon> {
+    match decode_icon_png(APP_ICON_PNG).and_then(|(rgba, width, height)| {
+        iced::window::icon::from_rgba(rgba, width, height).map_err(|err| err.to_string())
+    }) {
+        Ok(icon) => Some(icon),
+        Err(err) => {
+            eprintln!("加载配置窗口图标失败：{err}");
+            None
+        }
+    }
+}
+
+/// 系统通知用的图标文件路径。
+///
+/// Linux 的通知守护进程要的是主题图标名或文件路径，所以把内置图标落一份到数据目录；
+/// 内容长度变了（换了图标重新发版）才重写。
+fn notification_icon_path() -> Option<PathBuf> {
+    let dirs = ProjectDirs::from(APP_QUALIFIER, APP_ORGANIZATION, APP_NAME)?;
+    let path = dirs.data_dir().join("icon.png");
+
+    let up_to_date = std::fs::metadata(&path)
+        .map(|meta| meta.len() == APP_ICON_PNG.len() as u64)
+        .unwrap_or(false);
+
+    if !up_to_date {
+        if let Err(err) = std::fs::create_dir_all(dirs.data_dir()) {
+            eprintln!("创建数据目录失败：{err}");
+            return None;
+        }
+        if let Err(err) = std::fs::write(&path, APP_ICON_PNG) {
+            eprintln!("写入通知图标失败：{err}");
+            return None;
+        }
+    }
+
+    Some(path)
+}
+
+// ---------------------------------------------------------------------------
 // 配置窗口（iced，纯 Rust 控件，不涉及 HTML）
 // ---------------------------------------------------------------------------
 
@@ -362,10 +455,16 @@ fn run_config_window(initial_url: Option<String>) -> Option<String> {
         iced::Task::none()
     };
 
+    let window_settings = iced::window::Settings {
+        size: (480.0, 360.0).into(),
+        position: iced::window::Position::Centered,
+        icon: config_window_icon(),
+        ..iced::window::Settings::default()
+    };
+
     let application = iced::application(move || boot_state.clone(), update, view)
         .title("CircleChat 配置")
-        .window_size((480.0, 360.0))
-        .centered();
+        .window(window_settings);
 
     if let Err(err) = application.run() {
         eprintln!("配置窗口运行失败：{err}");
@@ -422,11 +521,29 @@ enum AppEvent {
     ResetConfig,
     /// 站内链接需要在当前 WebView 内打开（window.open / target=_blank）
     Navigate(String),
+    /// 页面请求发系统通知
+    Notify {
+        id: String,
+        title: String,
+        body: String,
+    },
+    /// 通知发送结果（从后台线程回到主线程，再由主线程回传给页面）
+    NotifyResult {
+        id: String,
+        ok: bool,
+        error: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize)]
 struct IpcMessage {
     action: String,
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    body: String,
 }
 
 /// 注入到每个页面的脚本：捕获重置快捷键并通过 IPC 通知 Rust 侧。
@@ -465,6 +582,10 @@ const CLIENT_NAME: &str = "circlechat-desktop";
 const CLIENT_UA_TOKEN: &str = "CircleChatDesktop";
 /// 允许用环境变量整体覆盖 UA，用来在不重新发版的情况下修 UA 相关的问题。
 const USER_AGENT_ENV: &str = "CIRCLECHAT_USER_AGENT";
+
+/// 系统通知的标题 / 正文长度上限（页面传进来的内容不可全信，截断一下）。
+const NOTIFICATION_TITLE_LIMIT: usize = 120;
+const NOTIFICATION_BODY_LIMIT: usize = 500;
 /// 入口文档请求头里带的客户端标记（小写，HTTP/2 要求）。
 const CLIENT_HEADER: &str = "x-circlechat-client";
 
@@ -758,6 +879,111 @@ fn notice_page(title: &str, body: &str) -> String {
         .replace("{{BODY}}", body)
 }
 
+// ---------------------------------------------------------------------------
+// 系统通知（给页面 JS 调用的接口）
+// ---------------------------------------------------------------------------
+
+/// 注入给页面的通知 API。页面里用 `await window.__CIRCLECHAT__.notify({...})` 调用。
+///
+/// 流程：JS 发 IPC（带一个自增 id） → Rust 后台线程调系统通知 → 主线程把结果
+/// 通过 `window.__circleChatNotifyResult(id, result)` 回传 → JS 的 Promise resolve。
+const NOTIFICATION_API_SCRIPT: &str = r#"
+(function () {
+  if (window.__CIRCLECHAT__ && window.__CIRCLECHAT__.notify) { return; }
+
+  var pending = new Map();
+  var sequence = 0;
+  var TIMEOUT_MS = 10000;
+
+  function resolvePending(id, result) {
+    var resolve = pending.get(id);
+    if (resolve) {
+      pending.delete(id);
+      resolve(result);
+    }
+  }
+
+  // Rust 侧回传结果的入口
+  window.__circleChatNotifyResult = resolvePending;
+
+  window.__CIRCLECHAT__ = Object.assign(window.__CIRCLECHAT__ || {}, {
+    notify: function (options) {
+      var input = typeof options === 'string' ? { title: options } : (options || {});
+      var id = 'n' + Date.now() + '-' + (++sequence);
+
+      return new Promise(function (resolve) {
+        if (!window.ipc) {
+          resolve({ ok: false, error: 'ipc-unavailable' });
+          return;
+        }
+
+        pending.set(id, resolve);
+
+        try {
+          window.ipc.postMessage(JSON.stringify({
+            action: 'notify',
+            id: id,
+            title: input.title == null ? '' : String(input.title),
+            body: input.body == null ? '' : String(input.body)
+          }));
+        } catch (error) {
+          pending.delete(id);
+          resolve({ ok: false, error: String(error) });
+          return;
+        }
+
+        setTimeout(function () {
+          if (pending.has(id)) {
+            pending.delete(id);
+            resolve({ ok: false, error: 'timeout' });
+          }
+        }, TIMEOUT_MS);
+      });
+    }
+  });
+})();
+"#;
+
+/// 发一条系统通知。阻塞式的 D-Bus / WinRT 调用，调用方要放到后台线程跑。
+fn show_notification(title: &str, body: &str) -> Result<(), String> {
+    let summary = truncate(title.trim(), NOTIFICATION_TITLE_LIMIT);
+    let body = truncate(body.trim(), NOTIFICATION_BODY_LIMIT);
+
+    let mut notification = notify_rust::Notification::new();
+    notification.appname(WINDOW_TITLE);
+
+    // 通知图标：Linux 走文件路径，其它平台由系统决定（尽力而为，失败不影响通知本身）
+    if let Some(icon) = notification_icon_path() {
+        notification.icon(&icon.to_string_lossy());
+    }
+
+    // 标题为空时退回应用名，避免出现空标题的系统通知
+    if summary.is_empty() {
+        notification.summary(WINDOW_TITLE);
+    } else {
+        notification.summary(&summary);
+    }
+    if !body.is_empty() {
+        notification.body(&body);
+    }
+
+    notification
+        .show()
+        .map(|_| ())
+        .map_err(|err| err.to_string())
+}
+
+/// 按字符数截断（不会切断多字节字符）。
+fn truncate(input: &str, limit: usize) -> String {
+    if input.chars().count() <= limit {
+        return input.to_string();
+    }
+
+    let mut truncated: String = input.chars().take(limit).collect();
+    truncated.push('…');
+    truncated
+}
+
 /// 说明页里插入动态内容（版本号之类）前一律转义。
 fn escape_html(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
@@ -785,9 +1011,11 @@ fn run_webview(source: WebViewSource, config_path: PathBuf) -> wry::Result<()> {
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     let ipc_proxy = event_loop.create_proxy();
     let window_proxy = event_loop.create_proxy();
+    let notify_proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
         .with_title(WINDOW_TITLE)
+        .with_window_icon(window_icon())
         .with_inner_size(LogicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT))
         .build(&event_loop)
         .expect("创建主窗口失败");
@@ -811,13 +1039,29 @@ fn run_webview(source: WebViewSource, config_path: PathBuf) -> wry::Result<()> {
         .with_user_agent(user_agent)
         .with_initialization_script(client_marker_script())
         .with_initialization_script(RESET_SHORTCUT_SCRIPT)
+        // 页面可调用的系统通知 API：await window.__CIRCLECHAT__.notify({...})
+        .with_initialization_script(NOTIFICATION_API_SCRIPT)
         .with_ipc_handler(move |request| {
-            let reset_requested = serde_json::from_str::<IpcMessage>(request.body())
-                .map(|message| message.action == "reset")
-                .unwrap_or(false);
+            let message = match serde_json::from_str::<IpcMessage>(request.body()) {
+                Ok(message) => message,
+                Err(err) => {
+                    eprintln!("收到无法解析的 IPC 消息：{err}");
+                    return;
+                }
+            };
 
-            if reset_requested {
-                let _ = ipc_proxy.send_event(AppEvent::ResetConfig);
+            match message.action.as_str() {
+                "reset" => {
+                    let _ = ipc_proxy.send_event(AppEvent::ResetConfig);
+                }
+                "notify" => {
+                    let _ = ipc_proxy.send_event(AppEvent::Notify {
+                        id: message.id,
+                        title: message.title,
+                        body: message.body,
+                    });
+                }
+                other => eprintln!("收到未知的 IPC action：{other}"),
             }
         })
         // 站外链接：拦下来交给系统浏览器
@@ -916,6 +1160,36 @@ fn run_webview(source: WebViewSource, config_path: PathBuf) -> wry::Result<()> {
             Event::UserEvent(AppEvent::Navigate(target)) => {
                 if let Err(err) = webview.load_url(&target) {
                     eprintln!("站内跳转失败（{target}）：{err}");
+                }
+            }
+            Event::UserEvent(AppEvent::Notify { id, title, body }) => {
+                // D-Bus / WinRT 调用可能阻塞，丢到后台线程，结果再回到主线程
+                let proxy = notify_proxy.clone();
+                std::thread::spawn(move || {
+                    let (ok, error) = match show_notification(&title, &body) {
+                        Ok(()) => {
+                            println!("已发送系统通知：{title}");
+                            (true, None)
+                        }
+                        Err(err) => {
+                            eprintln!("发送系统通知失败：{err}");
+                            (false, Some(err))
+                        }
+                    };
+
+                    let _ = proxy.send_event(AppEvent::NotifyResult { id, ok, error });
+                });
+            }
+            Event::UserEvent(AppEvent::NotifyResult { id, ok, error }) => {
+                // 用 serde_json 生成字面量，避免标题里的引号把脚本拼坏
+                let id_literal = serde_json::to_string(&id).unwrap_or_else(|_| "\"\"".to_string());
+                let payload = serde_json::json!({ "ok": ok, "error": error });
+                let script = format!(
+                    "window.__circleChatNotifyResult && window.__circleChatNotifyResult({id_literal}, {payload});"
+                );
+
+                if let Err(err) = webview.evaluate_script(&script) {
+                    eprintln!("回传通知结果失败：{err}");
                 }
             }
             _ => {}
@@ -1039,6 +1313,44 @@ mod tests {
         assert!(page.contains("尚未配置服务地址"));
         assert!(page.contains(MIN_WEB_VERSION), "说明页里应该带上版本要求");
         assert!(!page.contains("{{"), "占位符应该都被替换掉");
+    }
+
+    #[test]
+    fn embedded_icon_decodes_to_rgba() {
+        let (rgba, width, height) = decode_icon_png(APP_ICON_PNG).expect("内置图标应该能解码");
+
+        assert_eq!((width, height), (256, 256));
+        assert_eq!(rgba.len(), (width * height) as usize * 4);
+        assert!(
+            rgba.chunks_exact(4).any(|pixel| pixel[3] > 0),
+            "图标不应该整张都是透明的"
+        );
+    }
+
+    #[test]
+    fn window_icons_build_from_embedded_png() {
+        assert!(window_icon().is_some(), "tao 窗口图标应该能构造");
+        assert!(config_window_icon().is_some(), "iced 窗口图标应该能构造");
+    }
+
+    #[test]
+    fn truncate_keeps_multibyte_intact() {
+        assert_eq!(truncate("abcdef", 3), "abc…");
+        assert_eq!(truncate("中文测试", 2), "中文…");
+        assert_eq!(truncate("短", 10), "短");
+    }
+
+    #[test]
+    fn ipc_message_defaults_are_tolerated() {
+        // 重置快捷键发过来的就是这种最小消息
+        let reset: IpcMessage = serde_json::from_str("{\"action\":\"reset\"}").unwrap();
+        assert_eq!(reset.action, "reset");
+        assert!(reset.id.is_empty() && reset.title.is_empty() && reset.body.is_empty());
+
+        let notify: IpcMessage =
+            serde_json::from_str("{\"action\":\"notify\",\"id\":\"1\",\"title\":\"t\",\"body\":\"b\"}")
+                .unwrap();
+        assert_eq!((notify.id.as_str(), notify.title.as_str()), ("1", "t"));
     }
 
     #[test]
