@@ -10,6 +10,7 @@ mod identity;
 mod links;
 mod notice;
 mod notification;
+mod shake;
 mod site;
 mod webview;
 

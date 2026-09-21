@@ -1,14 +1,15 @@
 //! 主窗口：tao 窗口 + wry WebView，以及事件循环里处理的那些事
 //! （重置快捷键、站内跳转、系统通知、下载）。
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use serde::Deserialize;
-use tao::dpi::LogicalSize;
+use tao::dpi::{LogicalPosition, LogicalSize};
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
-use tao::window::WindowBuilder;
+use tao::window::{UserAttentionType, WindowBuilder};
 use wry::{NewWindowResponse, WebContext, WebViewBuilder};
 
 use crate::app;
@@ -18,6 +19,7 @@ use crate::identity;
 use crate::links;
 use crate::notice;
 use crate::notification;
+use crate::shake;
 
 const WINDOW_WIDTH: f64 = 1100.0;
 const WINDOW_HEIGHT: f64 = 720.0;
@@ -89,7 +91,31 @@ enum AppEvent {
         ok: bool,
         error: Option<String>,
     },
+    /// 页面请求把窗口置顶到前台并抖动（新消息提醒等场景）
+    Shake,
+    /// 抖动动画的一帧（step 为位移模式索引），真正改位置只在主线程做
+    ShakeTick {
+        step: u32,
+    },
 }
+
+/// 抖动位移模式（像素）：起步静息 → 左右上下错动 → 收尾回到 (0,0)。
+const SHAKE_PATTERN: &[(i32, i32)] = &[
+    (0, 0),
+    (-12, 0),
+    (12, 0),
+    (-12, 8),
+    (12, -8),
+    (-9, 0),
+    (9, 0),
+    (-6, 5),
+    (6, -5),
+    (0, 0),
+];
+/// 抖动总帧数（等于模式长度，保证收尾落回静息位）。
+const SHAKE_STEPS: u32 = SHAKE_PATTERN.len() as u32;
+/// 每帧间隔（毫秒）：太快看不清、太慢像卡顿。
+const SHAKE_STEP_MS: u64 = 28;
 
 /// WebView 的持久化数据目录：HTTP 磁盘缓存、Cookie、localStorage 都落在这里。
 /// wry 默认用的是临时上下文（`WebContext::new_ephemeral`），什么都不会留下，必须自己给一个目录。
@@ -140,6 +166,8 @@ pub(crate) fn run(source: WebViewSource, config_path: PathBuf) -> wry::Result<()
         .with_initialization_script(RESET_SHORTCUT_SCRIPT)
         // 页面可调用的系统通知 API：await window.__CIRCLECHAT__.notify({...})
         .with_initialization_script(notification::API_SCRIPT)
+        // 页面可调用的“抖动窗口”API：await window.__CIRCLECHAT__.shakeWindow()
+        .with_initialization_script(shake::API_SCRIPT)
         .with_ipc_handler(move |request| {
             let message = match serde_json::from_str::<IpcMessage>(request.body()) {
                 Ok(message) => message,
@@ -160,6 +188,9 @@ pub(crate) fn run(source: WebViewSource, config_path: PathBuf) -> wry::Result<()
                         body: message.body,
                     });
                 }
+                "shake" => {
+                    let _ = ipc_proxy.send_event(AppEvent::Shake);
+                }
                 other => eprintln!("收到未知的 IPC action：{other}"),
             }
         })
@@ -173,13 +204,18 @@ pub(crate) fn run(source: WebViewSource, config_path: PathBuf) -> wry::Result<()
             }
         })
         // window.open / target="_blank"：站外的走系统浏览器，站内的在当前 WebView 打开
-        .with_new_window_req_handler(move |target, _features| {
-            if links::is_external_link(&target, &new_window_site) {
-                links::open_in_system(&target);
-            } else {
-                let _ = window_proxy.send_event(AppEvent::Navigate(target));
+        .with_new_window_req_handler({
+            // 这个 move 闭包会拿走 window_proxy，所以先给它一个独立克隆，
+            // 事件循环里还要用原版 window_proxy 发 ShakeTick。
+            let new_window_proxy = window_proxy.clone();
+            move |target, _features| {
+                if links::is_external_link(&target, &new_window_site) {
+                    links::open_in_system(&target);
+                } else {
+                    let _ = new_window_proxy.send_event(AppEvent::Navigate(target));
+                }
+                NewWindowResponse::Deny
             }
-            NewWindowResponse::Deny
         })
         // 下载：落到系统下载目录，重名自动加序号
         .with_download_started_handler(|url, destination| {
@@ -242,6 +278,10 @@ pub(crate) fn run(source: WebViewSource, config_path: PathBuf) -> wry::Result<()
 
     let webview = Rc::new(webview);
 
+    // 抖动动画的基准位置（主线程独享，用 RefCell 即可），收到 Shake 时记下当前
+    // 窗口位置，之后每一帧 ShakeTick 都相对它做偏移，收尾帧落回原位。
+    let shake_base = Rc::new(RefCell::new(None::<LogicalPosition<f64>>));
+
     // tao 的事件循环是 `-> !`：退出即结束进程，所以“回到配置窗口”必须重启自身。
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -292,6 +332,43 @@ pub(crate) fn run(source: WebViewSource, config_path: PathBuf) -> wry::Result<()
                 if let Err(err) = webview.evaluate_script(&script) {
                     eprintln!("回传通知结果失败：{err}");
                 }
+            }
+            Event::UserEvent(AppEvent::Shake) => {
+                // 1) 先置顶到前台：取消最小化、可见、抢焦点、并在任务栏闪一下
+                window.set_minimized(false);
+                window.set_visible(true);
+                let _ = window.set_focus();
+                window.request_user_attention(Some(UserAttentionType::Informational));
+
+                // 2) 记下当前位置作为抖动基准（取不到就跳过位移，只置顶）
+                let base = window.outer_position().ok().map(|p| p.to_logical(window.scale_factor()));
+                *shake_base.borrow_mut() = base;
+                if base.is_none() {
+                    eprintln!("读取窗口位置失败，抖动跳过，仅置顶");
+                }
+
+                // 3) 后台线程只负责按节奏发 tick，真正改位置只在主线程做（跨平台安全，
+                //    也避免把平台相关的 Window 跨线程传递）。
+                let proxy = window_proxy.clone();
+                std::thread::spawn(move || {
+                    for step in 0..SHAKE_STEPS {
+                        std::thread::sleep(std::time::Duration::from_millis(SHAKE_STEP_MS));
+                        if proxy.send_event(AppEvent::ShakeTick { step }).is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+            Event::UserEvent(AppEvent::ShakeTick { step }) => {
+                let base = match *shake_base.borrow() {
+                    Some(base) => base,
+                    None => return,
+                };
+                let (dx, dy) = SHAKE_PATTERN[(step as usize) % SHAKE_PATTERN.len()];
+                window.set_outer_position(LogicalPosition::new(
+                    base.x + dx as f64,
+                    base.y + dy as f64,
+                ));
             }
             _ => {}
         }
