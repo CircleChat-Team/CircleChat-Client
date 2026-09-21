@@ -1,10 +1,11 @@
 //! 站点身份校验。
 //!
-//! 保存地址前，客户端会先拉取 `{URL}/api/app-manifest`，核对三项：
-//! app_id、`sha256(app_id + version + timestamp + SECRET)` 签名、时间戳偏差。
+//! 保存地址前，客户端会先拉取 `{URL}/api/app-manifest`，核对：
+//! app_id、时间戳偏差，以及 `sha256(app_id + version + timestamp + SECRET)` 签名。
 //! 全过才允许保存并进入 WebView。
 //!
-//! SECRET 只从环境变量 `APP_SECRET` 读，不写死在代码里。
+//! SECRET 可选，从环境变量 `APP_SECRET` 读（自建服务可设）；**没设时跳过签名校验**，
+//! 只核对 app_id 与时间戳，方便官方客户端开箱即用、无需分发密钥。
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -32,7 +33,7 @@ const MANIFEST_TIMEOUT: Duration = Duration::from_secs(8);
 /// SECRET 所在的环境变量名。
 const SECRET_ENV: &str = "APP_SECRET";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct AppManifest {
     app_id: String,
     version: String,
@@ -89,7 +90,7 @@ pub(crate) fn verify_site_cached(base_url: &str) -> Result<(), String> {
 
 /// 校验站点身份：拉取身份信息，再逐项核对。
 fn verify_site(base_url: &str) -> Result<(), String> {
-    let secret = app_secret().ok_or_else(|| format!("未设置环境变量 {SECRET_ENV}"))?;
+    let secret = app_secret();
 
     let manifest = fetch_manifest(&format!("{base_url}{MANIFEST_PATH}"))?;
     println!(
@@ -101,7 +102,9 @@ fn verify_site(base_url: &str) -> Result<(), String> {
 }
 
 /// 纯校验逻辑（不碰网络、不读环境变量），方便单测。
-fn verify_manifest(manifest: &AppManifest, expected_app_id: &str, secret: &str, now: i64) -> Result<(), String> {
+///
+/// `secret` 为 `None` 时跳过签名校验（仅核对 app_id 与时间戳）。
+fn verify_manifest(manifest: &AppManifest, expected_app_id: &str, secret: Option<&str>, now: i64) -> Result<(), String> {
     if manifest.app_id != expected_app_id {
         return Err(format!("app_id 不匹配（期望 {expected_app_id}，实际 {}）", manifest.app_id));
     }
@@ -110,6 +113,12 @@ fn verify_manifest(manifest: &AppManifest, expected_app_id: &str, secret: &str, 
     if drift > TIMESTAMP_TOLERANCE_SECS {
         return Err(format!("时间戳偏差 {drift} 秒"));
     }
+
+    // 没设 APP_SECRET 时跳过签名校验（仅核对 app_id / 时间戳），方便开箱即用。
+    let Some(secret) = secret else {
+        println!("未设置 APP_SECRET，跳过签名校验（仅核对 app_id / 时间戳）");
+        return Ok(());
+    };
 
     let expected = manifest_signature(expected_app_id, &manifest.version, manifest.timestamp, secret);
     if !constant_time_eq(
@@ -220,9 +229,9 @@ mod tests {
     fn valid_manifest_passes() {
         let item = manifest("1.0.0", 1700000000, signature("1.0.0", 1700000000, SECRET));
 
-        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000100).is_ok());
+        assert!(verify_manifest(&item, expected_app_id(), Some(SECRET), 1700000100).is_ok());
         // 边界：正好 300 秒也算通过
-        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000300).is_ok());
+        assert!(verify_manifest(&item, expected_app_id(), Some(SECRET), 1700000300).is_ok());
     }
 
     #[test]
@@ -230,21 +239,21 @@ mod tests {
         let mut item = manifest("1.0.0", 1700000000, signature("1.0.0", 1700000000, SECRET));
         item.app_id = "com.evil.app".to_string();
 
-        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000000).is_err());
+        assert!(verify_manifest(&item, expected_app_id(), Some(SECRET), 1700000000).is_err());
     }
 
     #[test]
     fn stale_timestamp_is_rejected() {
         let item = manifest("1.0.0", 1700000000, signature("1.0.0", 1700000000, SECRET));
 
-        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000301).is_err());
+        assert!(verify_manifest(&item, expected_app_id(), Some(SECRET), 1700000301).is_err());
     }
 
     #[test]
     fn wrong_secret_is_rejected() {
         let item = manifest("1.0.0", 1700000000, signature("1.0.0", 1700000000, "wrong"));
 
-        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000000).is_err());
+        assert!(verify_manifest(&item, expected_app_id(), Some(SECRET), 1700000000).is_err());
     }
 
     #[test]
@@ -255,7 +264,19 @@ mod tests {
             format!("sha256:{}", signature("1.0.0", 1700000000, SECRET)),
         );
 
-        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000000).is_ok());
+        assert!(verify_manifest(&item, expected_app_id(), Some(SECRET), 1700000000).is_ok());
+    }
+
+    #[test]
+    fn no_secret_skips_signature() {
+        // 没设 APP_SECRET 时只校验 app_id / 时间戳，签名不参与（开箱即用降级路径）
+        let item = manifest("1.0.0", 1700000000, "garbage-signature".to_string());
+
+        assert!(verify_manifest(&item, expected_app_id(), None, 1700000000).is_ok());
+        // app_id 不符仍然拒绝
+        let mut evil = item.clone();
+        evil.app_id = "com.evil.app".to_string();
+        assert!(verify_manifest(&evil, expected_app_id(), None, 1700000000).is_err());
     }
 
     #[test]
