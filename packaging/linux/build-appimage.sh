@@ -30,18 +30,53 @@ trap 'rm -rf "$TOOLS" "$WORK"' EXIT
 
 download() {
     local url="$1" target="$2"
-    echo "下载：$(basename "$target")"
-    curl -fsSL "$url" -o "$target"
-    chmod +x "$target"
+    local try=0 max=5
+    while [[ $try -lt $max ]]; do
+        echo "下载：$(basename "$target")（第 $((try + 1))/$max 次）"
+        if curl -fsSL "$url" -o "$target"; then
+            chmod +x "$target"
+            return 0
+        fi
+        try=$((try + 1))
+        sleep 3
+    done
+    echo "错误：下载失败 $url" >&2
+    exit 1
+}
+
+# 非致命下载：失败只返回 1，不退出（用于“能降级就降级”的插件）
+try_download() {
+    local url="$1" target="$2"
+    local try=0 max=5
+    while [[ $try -lt $max ]]; do
+        echo "下载：$(basename "$target")（第 $((try + 1))/$max 次）"
+        if curl -fsSL "$url" -o "$target"; then
+            chmod +x "$target"
+            return 0
+        fi
+        try=$((try + 1))
+        sleep 3
+    done
+    return 1
 }
 
 download "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${ARCH}.AppImage" \
          "$TOOLS/linuxdeploy"
-# GTK 插件：把 gdk-pixbuf 加载器、GLib 模块这些一起收进去，否则图标/主题可能显示不出来
-download "https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk-${ARCH}.AppImage" \
-         "$TOOLS/linuxdeploy-plugin-gtk"
-download "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${ARCH}.AppImage" \
+# AppImageKit 的 continuous 发布已下架（404），改用 AppImage/appimagetool 的 latest 稳定版。
+# latest/download 会自动 302 到最新 release 资产，名字同样是 appimagetool-${ARCH}.AppImage。
+download "https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-${ARCH}.AppImage" \
          "$TOOLS/appimagetool"
+
+# GTK 插件：把 gdk-pixbuf 加载器、GLib 模块收进去，否则图标/主题可能显示不出来。
+# 上游（linuxdeploy/linuxdeploy-plugin-gtk 的 continuous 发布）已下架，下载不到就降级跳过，
+# AppImage 依旧能生成，只是图标/主题可能不完美——避免上游变动把整个 CI 打挂。
+PLUGIN_ARGS=()
+if try_download "https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk-${ARCH}.AppImage" \
+         "$TOOLS/linuxdeploy-plugin-gtk"; then
+    PLUGIN_ARGS=(--plugin gtk)
+else
+    echo "警告：linuxdeploy-plugin-gtk 下载失败（上游已下架），跳过 --plugin gtk；AppImage 仍可生成，但图标/主题可能不完美。" >&2
+fi
 
 # linuxdeploy 的 --output appimage 会自己调用 appimagetool，而 --plugin gtk 也要能在 PATH 里
 # 找到 linuxdeploy-plugin-gtk；把它们所在的目录加进 PATH，否则 linuxdeploy 生成步骤会静默失败、
@@ -53,13 +88,21 @@ mkdir -p "$WORK/AppDir"
 # linuxdeploy 用 VERSION 决定 AppImage 的文件名
 export VERSION
 
+# linuxdeploy 按 --icon-file 的文件名把图标部署进 AppDir；桌面文件 Icon=circlechat 需要
+# 同名图标（circlechat.png），否则报 "Could not find suitable icon" 且不产出 .AppImage。
+# 这里复制一份按 Icon 名命名的图标传入（不依赖已下架的 GTK 插件来做图标主题化）。
+ICON_ENTRY="$(grep -i '^Icon=' "$DESKTOP" | head -1 | cut -d= -f2 | sed 's/\.[a-zA-Z0-9]*$//')"
+ICON_FOR_APPIMAGE="$TOOLS/circlechat.png"
+[[ -n "$ICON_ENTRY" ]] && ICON_FOR_APPIMAGE="$TOOLS/$ICON_ENTRY.png"
+cp "$ICON" "$ICON_FOR_APPIMAGE"
+
 # linuxdeploy 会自己把二进制依赖的 .so 收进 AppDir
 ARCH="$ARCH" "$TOOLS/linuxdeploy" \
     --appdir "$WORK/AppDir" \
     --executable "$BIN" \
     --desktop-file "$DESKTOP" \
-    --icon-file "$ICON" \
-    --plugin gtk \
+    --icon-file "$ICON_FOR_APPIMAGE" \
+    "${PLUGIN_ARGS[@]}" \
     --output appimage 2>&1 | tail -20
 
 mkdir -p "$OUT_DIR"
