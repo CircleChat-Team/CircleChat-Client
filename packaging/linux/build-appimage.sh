@@ -96,13 +96,36 @@ ICON_FOR_APPIMAGE="$TOOLS/circlechat.png"
 [[ -n "$ICON_ENTRY" ]] && ICON_FOR_APPIMAGE="$TOOLS/$ICON_ENTRY.png"
 cp "$ICON" "$ICON_FOR_APPIMAGE"
 
-# linuxdeploy 先把二进制依赖的 .so（含整套桌面图形栈）收进 AppDir 并产出 AppImage。
+# WebKit2GTK / GTK / GLib 这套「桌面图形栈」是发行版强相关的：
+# 把它们打进 AppImage 后，换一台 glibc / glib 版本不同的机器（比如 CI 用 22.04、
+# 用户在 24.04 / 26.04）就会出现符号对不上、WebView 的 web 进程助手找不到等问题，
+# 表现就是「窗口空白、页面完全加载不出来、控制台零报错」。
+# 所以这里用 glob 直接【排除】这套库，不让 linuxdeploy 打包进去，
+# 运行时复用宿主系统已安装的 WebKit2GTK（本项目的 .deb 已通过 apt 依赖声明保证它
+# 存在；纯 AppImage 用户需自行装有 libwebkit2gtk-4.1）。这样 AppImage 跨发行版才稳。
+EXCLUDE_GLOBS=(
+  'libwebkit2gtk*' 'libjavascriptcoregtk*'
+  'libgtk-3*' 'libgdk-3*' 'libgdk_pixbuf*'
+  'libglib*' 'libgobject*' 'libgio*' 'libgmodule*' 'libgthread*'
+  'libsoup*'
+  'libpango*' 'libpangocairo*' 'libpangoft2*'
+  'libcairo*'
+  'libharfbuzz*'
+  'libatspi*' 'libgudev*' 'libcloudproviders*' 'libnotify*'
+)
+EXCLUDE_ARGS=()
+for g in "${EXCLUDE_GLOBS[@]}"; do
+  EXCLUDE_ARGS+=(--exclude-library="$g")
+done
+
+# linuxdeploy 把二进制依赖的 .so 收进 AppDir 并产出 AppImage（桌面栈已排除）
 ARCH="$ARCH" "$TOOLS/linuxdeploy" \
     --appdir "$WORK/AppDir" \
     --executable "$BIN" \
     --desktop-file "$DESKTOP" \
     --icon-file "$ICON_FOR_APPIMAGE" \
     "${PLUGIN_ARGS[@]}" \
+    "${EXCLUDE_ARGS[@]}" \
     --output appimage 2>&1 | tail -20
 
 mkdir -p "$OUT_DIR"
@@ -118,39 +141,4 @@ if [[ ${#appimages[@]} -eq 0 ]]; then
 fi
 mv "${appimages[0]}" "$OUTPUT"
 chmod +x "$OUTPUT"
-
-# --- 重新打包：去掉与宿主不兼容的「桌面图形栈」 ---
-# WebKit2GTK / GTK / GLib 是发行版强相关的：CI 在 ubuntu-22.04 打出来的这套库，
-# 在 glibc / glib 版本更新的机器（如 24.04 / 26.04）上会出现符号对不上、WebView
-# 的 web 进程助手找不到等问题，表现就是「窗口空白、页面完全加载不出来、控制台零报错」。
-# 这里把这套库从 AppImage 里删掉，运行时直接复用宿主系统已安装的 WebKit2GTK
-# （本项目的 .deb 已通过 apt 依赖声明保证它存在；纯 AppImage 用户需自行装有
-# libwebkit2gtk-4.1）。这样 AppImage 跨发行版才稳。
-# 解包用官方 `--appimage-extract`（本环境验证可用）；该版本不认目录参数，
-# 固定解到 ./squashfs-root，所以在 $WORK 里执行，避免污染仓库。
-EXTRACTED="$WORK/squashfs-root"
-rm -rf "$EXTRACTED"
-( cd "$WORK" && "$OUTPUT" --appimage-extract ) >/dev/null 2>&1 || {
-  echo "错误：无法提取 AppImage 做二次打包" >&2; exit 1; }
-
-DESKTOP_LIBS=(
-  libwebkit2gtk-4.1 libjavascriptcoregtk-4.1
-  libgtk-3 libgdk-3 libgdk_pixbuf-2.0
-  libglib-2.0 libgobject-2.0 libgio-2.0 libgmodule-2.0 libgthread-2.0
-  libsoup-3.0
-  libpango-1.0 libpangocairo-1.0 libpangoft2-1.0
-  libcairo libcairo-gobject libharfbuzz libharfbuzz-icu
-  libatspi libgudev-1.0 libcloudproviders libnotify
-)
-for l in "${DESKTOP_LIBS[@]}"; do
-  rm -f "$EXTRACTED/usr/lib/$l.so"*
-done
-# WebKit 的 web / network 进程助手也要删，强制用宿主的
-rm -rf "$EXTRACTED/usr/lib/webkit2gtk-4.1" "$EXTRACTED/usr/libexec/webkit2gtk-4.1"
-
-mv "$OUTPUT" "$OUTPUT.bundled"
-"$TOOLS/appimagetool" "$EXTRACTED" "$OUTPUT" >/dev/null 2>&1 || {
-  echo "错误：二次打包失败" >&2; mv "$OUTPUT.bundled" "$OUTPUT"; exit 1; }
-rm -f "$OUTPUT.bundled"
-
-echo "已生成：$OUTPUT（已剔除桌面图形栈，运行时复用宿主 WebKit2GTK）"
+echo "已生成：$OUTPUT（已排除桌面图形栈，运行时复用宿主 WebKit2GTK）"
