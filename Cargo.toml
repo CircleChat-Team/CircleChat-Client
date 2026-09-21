@@ -1,6 +1,6 @@
 [package]
 name = "circlechat-client"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 description = "CircleChat 桌面客户端（wry WebView 外壳）"
 license = "MIT OR Apache-2.0"
