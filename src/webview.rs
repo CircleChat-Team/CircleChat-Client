@@ -19,6 +19,7 @@ use crate::identity;
 use crate::links;
 use crate::notice;
 use crate::notification;
+use crate::reload;
 use crate::shake;
 
 const WINDOW_WIDTH: f64 = 1100.0;
@@ -97,6 +98,8 @@ enum AppEvent {
     ShakeTick {
         step: u32,
     },
+    /// 页面请求重新加载当前页（F5 / Ctrl+R 或 window.__CIRCLECHAT__.reload()）
+    Reload,
 }
 
 /// 抖动位移模式（像素）：起步静息 → 左右上下错动 → 收尾回到 (0,0)。
@@ -168,6 +171,8 @@ pub(crate) fn run(source: WebViewSource, config_path: PathBuf) -> wry::Result<()
         .with_initialization_script(notification::API_SCRIPT)
         // 页面可调用的“抖动窗口”API：await window.__CIRCLECHAT__.shakeWindow()
         .with_initialization_script(shake::API_SCRIPT)
+        // 重新加载当前页：F5 / Ctrl+R 接管 + window.__CIRCLECHAT__.reload()
+        .with_initialization_script(reload::API_SCRIPT)
         .with_ipc_handler(move |request| {
             let message = match serde_json::from_str::<IpcMessage>(request.body()) {
                 Ok(message) => message,
@@ -190,6 +195,9 @@ pub(crate) fn run(source: WebViewSource, config_path: PathBuf) -> wry::Result<()
                 }
                 "shake" => {
                     let _ = ipc_proxy.send_event(AppEvent::Shake);
+                }
+                "reload" => {
+                    let _ = ipc_proxy.send_event(AppEvent::Reload);
                 }
                 other => eprintln!("收到未知的 IPC action：{other}"),
             }
@@ -301,6 +309,12 @@ pub(crate) fn run(source: WebViewSource, config_path: PathBuf) -> wry::Result<()
             Event::UserEvent(AppEvent::Navigate(target)) => {
                 if let Err(err) = webview.load_url(&target) {
                     eprintln!("站内跳转失败（{target}）：{err}");
+                }
+            }
+            Event::UserEvent(AppEvent::Reload) => {
+                println!("重新加载当前页");
+                if let Err(err) = webview.reload() {
+                    eprintln!("重新加载失败：{err}");
                 }
             }
             Event::UserEvent(AppEvent::Notify { id, title, body }) => {
