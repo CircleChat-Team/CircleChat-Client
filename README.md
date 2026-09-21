@@ -144,7 +144,7 @@ APP_SECRET='你的密钥' cargo run 2>&1 | tee run.log
 
 ```json
 {
-  "app_id": "com.example.myapp",
+  "app_id": "circlechat",
   "version": "1.0.0",
   "timestamp": 1700000000,
   "signature": "sha256(app_id+version+timestamp+SECRET)"
@@ -153,9 +153,11 @@ APP_SECRET='你的密钥' cargo run 2>&1 | tee run.log
 
 三项全部通过才允许保存：
 
-1. `app_id == "com.example.myapp"`（硬编码）
+1. `app_id` 默认要求为 `circlechat`（可用 `CIRCLECHAT_APP_ID` 环境变量覆盖；**客户端与服务端必须配置成同一个值**，签名才对得上）
 2. `signature == sha256(app_id + version + timestamp + SECRET)` 的小写 hex（大小写不敏感，允许 `sha256=` / `sha256:` 前缀）
 3. `|本地时间 - timestamp| <= 300` 秒
+
+> `SECRET` 即环境变量 `APP_SECRET`：**客户端与服务端必须设置成同一个值**，服务端用它签名、客户端用它验签。服务端未配置 `APP_SECRET` 时该接口直接返回 503（不下发任何可被伪造的清单）。
 
 > 校验结果**缓存在内存里，成功和失败都缓存**。所以服务端修好之后，需要让用户重启客户端才能重新校验。
 

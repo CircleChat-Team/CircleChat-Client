@@ -13,8 +13,16 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-/// 站点必须声明的应用 ID。
-const EXPECTED_APP_ID: &str = "com.example.myapp";
+/// 默认 `circlechat`（与官方服务端 package.json 的 name 一致）；
+/// 对接自建服务时可用环境变量 `CIRCLECHAT_APP_ID` 覆盖，
+/// 客户端与服务端必须使用同一个值，签名才对得上。
+fn expected_app_id() -> &'static str {
+    static APP_ID: OnceLock<&'static str> = OnceLock::new();
+    APP_ID.get_or_init(|| match std::env::var("CIRCLECHAT_APP_ID") {
+        Ok(value) if !value.trim().is_empty() => Box::leak(value.trim().to_string().into_boxed_str()),
+        _ => "circlechat",
+    })
+}
 /// 身份信息的接口路径。
 const MANIFEST_PATH: &str = "/api/app-manifest";
 /// 时间戳允许的偏差（秒）。
@@ -89,13 +97,13 @@ fn verify_site(base_url: &str) -> Result<(), String> {
         manifest.app_id, manifest.version, manifest.timestamp
     );
 
-    verify_manifest(&manifest, secret, unix_timestamp()?)
+    verify_manifest(&manifest, expected_app_id(), secret, unix_timestamp()?)
 }
 
 /// 纯校验逻辑（不碰网络、不读环境变量），方便单测。
-fn verify_manifest(manifest: &AppManifest, secret: &str, now: i64) -> Result<(), String> {
-    if manifest.app_id != EXPECTED_APP_ID {
-        return Err(format!("app_id 不匹配（{}）", manifest.app_id));
+fn verify_manifest(manifest: &AppManifest, expected_app_id: &str, secret: &str, now: i64) -> Result<(), String> {
+    if manifest.app_id != expected_app_id {
+        return Err(format!("app_id 不匹配（期望 {expected_app_id}，实际 {}）", manifest.app_id));
     }
 
     let drift = (now - manifest.timestamp).abs();
@@ -103,7 +111,7 @@ fn verify_manifest(manifest: &AppManifest, secret: &str, now: i64) -> Result<(),
         return Err(format!("时间戳偏差 {drift} 秒"));
     }
 
-    let expected = manifest_signature(EXPECTED_APP_ID, &manifest.version, manifest.timestamp, secret);
+    let expected = manifest_signature(expected_app_id, &manifest.version, manifest.timestamp, secret);
     if !constant_time_eq(
         expected.as_bytes(),
         normalize_signature(&manifest.signature).as_bytes(),
@@ -188,7 +196,7 @@ mod tests {
 
     fn manifest(version: &str, timestamp: i64, signature: String) -> AppManifest {
         AppManifest {
-            app_id: EXPECTED_APP_ID.to_string(),
+            app_id: expected_app_id().to_string(),
             version: version.to_string(),
             timestamp,
             signature,
@@ -196,15 +204,15 @@ mod tests {
     }
 
     fn signature(version: &str, timestamp: i64, secret: &str) -> String {
-        manifest_signature(EXPECTED_APP_ID, version, timestamp, secret)
+        manifest_signature(expected_app_id(), version, timestamp, secret)
     }
 
     #[test]
     fn signature_vector_matches_coreutils() {
-        // 真值来自：printf 'com.example.myapp1.0.01700000000s3cr3t' | sha256sum
+        // 真值来自：printf 'circlechat1.0.01700000000s3cr3t' | sha256sum
         assert_eq!(
             signature("1.0.0", 1700000000, SECRET),
-            "db404ccf3c5e8457a6a1a6f0f7288722692fd66955f65312d249fe2677541429"
+            "be7bda7c82ab2e44520d1456e95782403f57083eb449f8cfc7173bf7037159df"
         );
     }
 
@@ -212,9 +220,9 @@ mod tests {
     fn valid_manifest_passes() {
         let item = manifest("1.0.0", 1700000000, signature("1.0.0", 1700000000, SECRET));
 
-        assert!(verify_manifest(&item, SECRET, 1700000100).is_ok());
+        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000100).is_ok());
         // 边界：正好 300 秒也算通过
-        assert!(verify_manifest(&item, SECRET, 1700000300).is_ok());
+        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000300).is_ok());
     }
 
     #[test]
@@ -222,21 +230,21 @@ mod tests {
         let mut item = manifest("1.0.0", 1700000000, signature("1.0.0", 1700000000, SECRET));
         item.app_id = "com.evil.app".to_string();
 
-        assert!(verify_manifest(&item, SECRET, 1700000000).is_err());
+        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000000).is_err());
     }
 
     #[test]
     fn stale_timestamp_is_rejected() {
         let item = manifest("1.0.0", 1700000000, signature("1.0.0", 1700000000, SECRET));
 
-        assert!(verify_manifest(&item, SECRET, 1700000301).is_err());
+        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000301).is_err());
     }
 
     #[test]
     fn wrong_secret_is_rejected() {
         let item = manifest("1.0.0", 1700000000, signature("1.0.0", 1700000000, "wrong"));
 
-        assert!(verify_manifest(&item, SECRET, 1700000000).is_err());
+        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000000).is_err());
     }
 
     #[test]
@@ -247,7 +255,7 @@ mod tests {
             format!("sha256:{}", signature("1.0.0", 1700000000, SECRET)),
         );
 
-        assert!(verify_manifest(&item, SECRET, 1700000000).is_ok());
+        assert!(verify_manifest(&item, expected_app_id(), SECRET, 1700000000).is_ok());
     }
 
     #[test]
