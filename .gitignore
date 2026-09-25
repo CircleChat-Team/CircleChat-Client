@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Miscellaneous
 *.class
 *.log
@@ -46,3 +47,8 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+=======
+.codebuddy/
+>>>>>>> origin/main
+
+# CircleChat 工具目录.codebuddy/
