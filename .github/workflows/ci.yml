@@ -22,12 +22,16 @@ jobs:
         include:
           - platform: windows
             os: windows-latest
+            path: build/windows/x64/runner/Release
           - platform: linux
             os: ubuntu-24.04
+            path: build/linux/x64/release/bundle
           - platform: macos
             os: macos-15
+            path: build/macos/Build/Products/Release
           - platform: android
             os: ubuntu-24.04
+            path: build/app/outputs/flutter-apk
 
     steps:
       - uses: actions/checkout@v5
@@ -73,3 +77,11 @@ jobs:
         if: matrix.platform == 'android'
         timeout-minutes: 30
         run: flutter build apk --release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: circlechat-client-${{ matrix.platform }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
+          retention-days: 7
