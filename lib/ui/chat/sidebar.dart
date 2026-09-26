@@ -3,6 +3,7 @@
 // 与 Web 端 Sidebar.vue 行为对齐：未读数角标、在线/离开/离线状态、群管理入口（暂未开放）。
 
 import 'package:flutter/material.dart';
+
 import '../../state/chat_store.dart';
 import '../../core/intl.dart';
 import '../../core/models.dart';
@@ -63,7 +64,10 @@ class _SidebarState extends State<Sidebar> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('common.cancel'))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(tr('common.cancel')),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
             child: Text(tr('common.ok')),
@@ -76,7 +80,10 @@ class _SidebarState extends State<Sidebar> {
   // ---------- “+” 功能菜单 ----------
 
   Future<void> _createGroup() async {
-    final name = await _prompt(tr('chat.group.create'), tr('chat.group.create.name'));
+    final name = await _prompt(
+      tr('chat.group.create'),
+      tr('chat.group.create.name'),
+    );
     if (name == null || name.isEmpty) return;
     final ok = await store.createGroup(name);
     _toast(ok ? 'chat.create.done' : 'chat.create.fail');
@@ -90,7 +97,10 @@ class _SidebarState extends State<Sidebar> {
   }
 
   Future<void> _friendAdd() async {
-    final name = await _prompt(tr('chat.friend.add'), tr('chat.friend.add.name'));
+    final name = await _prompt(
+      tr('chat.friend.add'),
+      tr('chat.friend.add.name'),
+    );
     if (name == null || name.isEmpty) return;
     final ok = await store.friendRequest(name);
     _toast(ok ? 'chat.friend.done' : 'chat.friend.fail');
@@ -152,7 +162,10 @@ class _SidebarState extends State<Sidebar> {
         }
       },
       itemBuilder: (_) => [
-        PopupMenuItem(value: 'group_create', child: Text(tr('chat.group.create'))),
+        PopupMenuItem(
+          value: 'group_create',
+          child: Text(tr('chat.group.create')),
+        ),
         PopupMenuItem(value: 'group_join', child: Text(tr('chat.group.join'))),
         PopupMenuItem(value: 'friend_add', child: Text(tr('chat.friend.add'))),
       ],
@@ -175,7 +188,9 @@ class _SidebarState extends State<Sidebar> {
                 hintText: tr('sidebar.search.placeholder'),
                 isDense: true,
                 prefixIcon: const Icon(Icons.search, size: 20),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
             ),
@@ -199,8 +214,10 @@ class _SidebarState extends State<Sidebar> {
           Padding(
             padding: const EdgeInsets.all(24),
             child: Center(
-              child: Text(tr('chat.friend.empty'),
-                  style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+              child: Text(
+                tr('chat.friend.empty'),
+                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+              ),
             ),
           ),
       ],
@@ -233,8 +250,10 @@ class _SidebarState extends State<Sidebar> {
           ),
           TextButton(
             onPressed: () => store.friendDecline(r.from),
-            child: Text(tr('chat.friend.reject'),
-                style: TextStyle(color: Colors.grey[600])),
+            child: Text(
+              tr('chat.friend.reject'),
+              style: TextStyle(color: Colors.grey[600]),
+            ),
           ),
         ],
       ),
@@ -278,8 +297,9 @@ class _SidebarState extends State<Sidebar> {
               vertical: 8,
             ),
             child: Row(
-              mainAxisAlignment:
-                  collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+              mainAxisAlignment: collapsed
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
               children: [
                 Avatar(
                   name: e.name,
@@ -293,8 +313,9 @@ class _SidebarState extends State<Sidebar> {
                       e.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(fontWeight: active ? FontWeight.w600 : null),
+                      style: TextStyle(
+                        fontWeight: active ? FontWeight.w600 : null,
+                      ),
                     ),
                   ),
                 ],
@@ -315,8 +336,9 @@ class _SidebarState extends State<Sidebar> {
     final online = store.isOnline(name);
     final away = store.isAway(name);
     final unread = store.unread['d:$name'] ?? 0;
-    final statusColor =
-        away ? Colors.orange : (online ? Colors.green : Colors.grey);
+    final statusColor = away
+        ? Colors.orange
+        : (online ? Colors.green : Colors.grey);
     final collapsed = widget.collapsed;
     return InkWell(
       onTap: () {
@@ -335,8 +357,9 @@ class _SidebarState extends State<Sidebar> {
               vertical: 8,
             ),
             child: Row(
-              mainAxisAlignment:
-                  collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+              mainAxisAlignment: collapsed
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
               children: [
                 Stack(
                   children: [
@@ -371,16 +394,19 @@ class _SidebarState extends State<Sidebar> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontWeight: active ? FontWeight.w600 : null),
+                            fontWeight: active ? FontWeight.w600 : null,
+                          ),
                         ),
                         Text(
                           away
                               ? tr('chat.away')
                               : online
-                                  ? tr('chat.online')
-                                  : tr('chat.offline'),
-                          style:
-                              TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              ? tr('chat.online')
+                              : tr('chat.offline'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ],
                     ),
@@ -419,33 +445,54 @@ class _SidebarState extends State<Sidebar> {
     return Container(
       decoration: BoxDecoration(
         border: Border(
-          top: BorderSide(color: dark ? const Color(0xFF3B3B3B) : const Color(0xFFE5E5E5)),
+          top: BorderSide(
+            color: dark ? const Color(0xFF3B3B3B) : const Color(0xFFE5E5E5),
+          ),
         ),
       ),
-      padding: EdgeInsets.symmetric(horizontal: collapsed ? 12 : 10, vertical: 6),
-      child: Row(
-        mainAxisAlignment:
-            collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
-        children: [
-          Avatar(name: store.me, image: store.avatarUrl(store.me), size: 32),
-          if (!collapsed) ...[
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                store.me,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-          IconButton(
-            tooltip: tr('common.logout'),
-            icon: const Icon(Icons.logout),
-            onPressed: () => store.logout(),
-          ),
-        ],
+      padding: EdgeInsets.symmetric(
+        horizontal: collapsed ? 4 : 10,
+        vertical: 6,
       ),
+      child: collapsed
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Avatar(
+                  name: store.me,
+                  image: store.avatarUrl(store.me),
+                  size: 32,
+                ),
+                IconButton(
+                  tooltip: tr('common.logout'),
+                  icon: const Icon(Icons.logout),
+                  onPressed: () => store.logout(),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Avatar(
+                  name: store.me,
+                  image: store.avatarUrl(store.me),
+                  size: 32,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    store.me,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                IconButton(
+                  tooltip: tr('common.logout'),
+                  icon: const Icon(Icons.logout),
+                  onPressed: () => store.logout(),
+                ),
+              ],
+            ),
     );
   }
 }

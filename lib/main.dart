@@ -18,14 +18,13 @@ Future<void> main() async {
     await windowManager.ensureInitialized();
     const opts = WindowOptions(
       title: 'CircleChat',
-      size: Size(1200, 800),
+      size: Size(1000, 640),
       minimumSize: Size(480, 360),
       center: true,
       titleBarStyle: TitleBarStyle.hidden,
       windowButtonVisibility: false,
     );
     await windowManager.waitUntilReadyToShow(opts, () async {
-      // 无边框窗口：隐藏系统标题栏，由 WindowFrame 绘制自定义 32px 标题栏与窗口按钮。
       await windowManager.setTitleBarStyle(
         TitleBarStyle.hidden,
         windowButtonVisibility: false,
@@ -121,15 +120,15 @@ class _CircleChatAppState extends State<CircleChatApp> {
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: Color(0xFF8A8A8A)),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: Color(0xFFBDBDBD)),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: Color(0xFF0067C0), width: 2),
           ),
         ),
@@ -260,15 +259,15 @@ class _CircleChatAppState extends State<CircleChatApp> {
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: Color(0xFF6E6E6E)),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: Color(0xFF5A5A5A)),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: Color(0xFF4CC2FF), width: 2),
           ),
         ),

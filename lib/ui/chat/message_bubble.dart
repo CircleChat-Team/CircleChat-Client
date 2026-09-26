@@ -63,8 +63,45 @@ class MessageBubble extends StatelessWidget {
         mainAxisAlignment:
             mine ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: mine
-            ? [Flexible(child: bubble), const SizedBox(width: 8), avatar]
-            : [avatar, const SizedBox(width: 8), Flexible(child: bubble)],
+            ? [
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (m.tsValue > 0) _timeText(scheme),
+                      bubble,
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                avatar,
+              ]
+            : [
+                avatar,
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (m.tsValue > 0) _timeText(scheme),
+                      bubble,
+                    ],
+                  ),
+                ),
+              ],
+      ),
+    );
+  }
+
+  /// 时间文本（显示在气泡上方，与气泡同侧对齐）
+  Widget _timeText(ColorScheme scheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Text(
+        friendlyTime(m.tsValue),
+        style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
       ),
     );
   }
@@ -72,7 +109,6 @@ class MessageBubble extends StatelessWidget {
   Widget _bubble(BuildContext context, ColorScheme scheme) {
     final bg = mine ? const Color(0xFFE6F1FB) : scheme.surface;
     final fg = scheme.onSurface;
-    final timeColor = mine ? scheme.onPrimary.withOpacity(0.8) : scheme.onSurfaceVariant;
 
     return GestureDetector(
       onLongPress: () => _showActions(context, scheme),
@@ -105,16 +141,6 @@ class MessageBubble extends StatelessWidget {
             if (m.reactions != null && m.reactions!.isNotEmpty) ...[
               const SizedBox(height: 6),
               _reactions(scheme),
-            ],
-            if (m.tsValue > 0) ...[
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  friendlyTime(m.tsValue),
-                  style: TextStyle(fontSize: 11, color: timeColor),
-                ),
-              ),
             ],
           ],
         ),

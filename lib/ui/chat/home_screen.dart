@@ -3,6 +3,7 @@
 // 顶部栏显示连接状态与会话标题；错误提示（store.onError）以 SnackBar 呈现。
 
 import 'package:flutter/material.dart';
+
 import '../../state/chat_store.dart';
 import '../../core/intl.dart';
 import '../../core/ws_client.dart';
@@ -20,12 +21,34 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   ChatStore get store => widget.store;
   bool _chatOpen = false;
 
   /// NavigationView 折叠状态：折叠后侧栏仅显示图标（宽约 56px）
   bool _navCollapsed = false;
+
+  late final AnimationController _navCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 150),
+    value: 1.0, // 1 = 展开宽度，0 = 折叠宽度
+  );
+
+  late final Animation<double> _navAnim = CurvedAnimation(
+    parent: _navCtrl,
+    curve: Curves.easeOutCubic,
+  );
+
+  void _toggleNav() {
+    if (_navCollapsed) {
+      setState(() => _navCollapsed = false);
+      _navCtrl.forward();
+    } else {
+      setState(() => _navCollapsed = true);
+      _navCtrl.reverse();
+    }
+  }
 
   @override
   void initState() {
@@ -36,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _navCtrl.dispose();
     store.removeListener(_onStore);
     super.dispose();
   }
@@ -62,14 +86,21 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      width: _navCollapsed ? 56 : 280,
-                      child: Sidebar(store: store, collapsed: _navCollapsed),
-                    ),
+                  AnimatedBuilder(
+                    animation: _navAnim,
+                    builder: (context, _) {
+                      final width = 56 + 224 * _navAnim.value;
+                      // Keep expanded controls out of the narrow range where
+                      // their minimum sizes would overflow during the tween.
+                      final compact = width < 240;
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          width: width,
+                          child: Sidebar(store: store, collapsed: compact),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -108,38 +139,40 @@ class _HomeScreenState extends State<HomeScreen> {
     return ColoredBox(
       color: dark ? const Color(0xFF2B2B2B) : const Color(0xFFFFFFFF),
       child: Column(
-      children: [
-        AppBar(
-          titleSpacing: 0,
-          leading: onBack != null
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: onBack,
-                )
-              // 宽屏：NavigationView 折叠/展开按钮
-              : IconButton(
-                  tooltip: tr(_navCollapsed ? 'nav.expand' : 'nav.collapse'),
-                  icon: Icon(_navCollapsed ? Icons.menu : Icons.menu_open),
-                  onPressed: () => setState(() => _navCollapsed = !_navCollapsed),
+        children: [
+          AppBar(
+            titleSpacing: 0,
+            leading: onBack != null
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: onBack,
+                  )
+                // 宽屏：NavigationView 折叠/展开按钮
+                : IconButton(
+                    tooltip: tr(_navCollapsed ? 'nav.expand' : 'nav.collapse'),
+                    icon: Icon(_navCollapsed ? Icons.menu : Icons.menu_open),
+                    onPressed: _toggleNav,
+                  ),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(connIcon, size: 18, color: connColor),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    store.roomTitle.isEmpty
+                        ? tr('chat.placeholder')
+                        : store.roomTitle,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(connIcon, size: 18, color: connColor),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  store.roomTitle.isEmpty ? tr('chat.placeholder') : store.roomTitle,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+              ],
+            ),
+            backgroundColor: scheme.surface,
           ),
-          backgroundColor: scheme.surface,
-        ),
-        Expanded(child: MessageList(store: store)),
-        if (store.hasRoom) InputBar(store: store),
-      ],
+          Expanded(child: MessageList(store: store)),
+          if (store.hasRoom) InputBar(store: store),
+        ],
       ),
     );
   }

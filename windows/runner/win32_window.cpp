@@ -136,11 +136,12 @@ bool Win32Window::Create(const std::wstring& title,
 
   HWND window = CreateWindow(
       window_class, title.c_str(),
-      // Frameless window: no system title bar (the custom 32px title bar is
-      // drawn by Flutter). WS_THICKFRAME keeps drag-resizing, and the
-      // MINIMIZEBOX/MAXIMIZEBOX styles keep animations and double-click
-      // maximize behavior.
-      WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+      // Frameless window: WS_OVERLAPPEDWINDOW minus WS_CAPTION so there is no
+      // system title bar (the custom 32px title bar is drawn by Flutter),
+      // while the system still maximizes to the work area (taskbar stays
+      // visible) and keeps DWM resize borders/corners.
+      WS_OVERLAPPED | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX |
+          WS_MAXIMIZEBOX,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
@@ -208,6 +209,24 @@ Win32Window::MessageHandler(HWND hwnd,
         // Size and position the child window.
         MoveWindow(child_content_, rect.left, rect.top, rect.right - rect.left,
                    rect.bottom - rect.top, TRUE);
+      }
+      return 0;
+    }
+
+    case WM_GETMINMAXINFO: {
+      // A WS_POPUP (frameless) window maximizes to the entire screen by
+      // default; restrict maximize bounds to the monitor work area so the
+      // taskbar stays visible ("maximize", not "fullscreen").
+      auto* mmi = reinterpret_cast<MINMAXINFO*>(lparam);
+      HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+      MONITORINFO mi{};
+      mi.cbSize = sizeof(mi);
+      if (GetMonitorInfo(monitor, &mi)) {
+        RECT work = mi.rcWork;
+        mmi->ptMaxPosition.x = work.left;
+        mmi->ptMaxPosition.y = work.top;
+        mmi->ptMaxSize.x = work.right - work.left;
+        mmi->ptMaxSize.y = work.bottom - work.top;
       }
       return 0;
     }
