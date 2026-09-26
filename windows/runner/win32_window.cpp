@@ -135,7 +135,12 @@ bool Win32Window::Create(const std::wstring& title,
   double scale_factor = dpi / 96.0;
 
   HWND window = CreateWindow(
-      window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
+      window_class, title.c_str(),
+      // Frameless window: no system title bar (the custom 32px title bar is
+      // drawn by Flutter). WS_THICKFRAME keeps drag-resizing, and the
+      // MINIMIZEBOX/MAXIMIZEBOX styles keep animations and double-click
+      // maximize behavior.
+      WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
