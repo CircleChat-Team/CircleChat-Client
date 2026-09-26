@@ -24,6 +24,9 @@ class _HomeScreenState extends State<HomeScreen> {
   ChatStore get store => widget.store;
   bool _chatOpen = false;
 
+  /// NavigationView 折叠状态：折叠后侧栏仅显示图标（宽约 56px）
+  bool _navCollapsed = false;
+
   @override
   void initState() {
     super.initState();
@@ -55,9 +58,11 @@ class _HomeScreenState extends State<HomeScreen> {
           if (wide) {
             return Row(
               children: [
-                SizedBox(
-                  width: 280,
-                  child: Sidebar(store: store),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  width: _navCollapsed ? 56 : 280,
+                  child: Sidebar(store: store, collapsed: _navCollapsed),
                 ),
                 const VerticalDivider(width: 1, thickness: 1),
                 Expanded(child: _chat()),
@@ -86,7 +91,9 @@ class _HomeScreenState extends State<HomeScreen> {
     };
     final connColor = conn == ConnState.on ? Colors.green : Colors.grey;
 
-    return Column(
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Column(
       children: [
         AppBar(
           titleSpacing: 0,
@@ -95,7 +102,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.arrow_back),
                   onPressed: onBack,
                 )
-              : null,
+              // 宽屏：NavigationView 折叠/展开按钮
+              : IconButton(
+                  tooltip: tr(_navCollapsed ? 'nav.expand' : 'nav.collapse'),
+                  icon: Icon(_navCollapsed ? Icons.menu : Icons.menu_open),
+                  onPressed: () => setState(() => _navCollapsed = !_navCollapsed),
+                ),
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -114,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(child: MessageList(store: store)),
         if (store.hasRoom) InputBar(store: store),
       ],
+      ),
     );
   }
 }

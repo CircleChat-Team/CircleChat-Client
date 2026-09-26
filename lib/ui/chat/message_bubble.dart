@@ -70,18 +70,19 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _bubble(BuildContext context, ColorScheme scheme) {
-    final bg = mine ? scheme.primary : scheme.surfaceContainerHighest;
-    final fg = mine ? scheme.onPrimary : scheme.onSurface;
+    final bg = mine ? const Color(0xFFE6F1FB) : scheme.surface;
+    final fg = scheme.onSurface;
     final timeColor = mine ? scheme.onPrimary.withOpacity(0.8) : scheme.onSurfaceVariant;
 
     return GestureDetector(
       onLongPress: () => _showActions(context, scheme),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 420),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: mine ? const Color(0xFFC7E0F4) : const Color(0xFFE5E5E5)),
+          borderRadius: BorderRadius.circular(4),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

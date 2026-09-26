@@ -57,7 +57,7 @@ class _InputBarState extends State<InputBar> {
     final reply = store.replyTarget;
 
     return Material(
-      elevation: 3,
+      elevation: 0,
       color: scheme.surface,
       child: SafeArea(
         top: false,
@@ -104,7 +104,7 @@ class _InputBarState extends State<InputBar> {
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -124,13 +124,13 @@ class _InputBarState extends State<InputBar> {
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(4),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 4),
-                  IconButton.filled(
+                  IconButton.filledTonal(
                     tooltip: tr('chat.typePlaceholder'),
                     onPressed: muted ? null : _send,
                     icon: const Icon(Icons.send),

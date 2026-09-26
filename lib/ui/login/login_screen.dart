@@ -267,19 +267,54 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: SingleChildScrollView(
+          constraints: const BoxConstraints(maxWidth: 920),
+          child: Padding(
             padding: const EdgeInsets.all(24),
-            child: _showForceChange
-                ? _forceChangeForm()
-                : _showTwofa
-                    ? _twofaForm()
-                    : _connected
-                        ? _loginForm()
-                        : _siteForm(),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Container(
+                    height: 470,
+                    padding: const EdgeInsets.all(36),
+                    color: scheme.primary,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.forum_outlined, color: scheme.onPrimary, size: 46),
+                        const SizedBox(height: 24),
+                        Text(tr('app.name'), style: TextStyle(color: scheme.onPrimary, fontSize: 30, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 12),
+                        Text(tr('login.siteDisclaimer'), style: TextStyle(color: scheme.onPrimary.withValues(alpha: 0.8), height: 1.5)),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 5,
+                  child: Container(
+                    height: 470,
+                    color: scheme.surface,
+                    padding: const EdgeInsets.fromLTRB(40, 32, 40, 28),
+                    child: SingleChildScrollView(
+                      child: _showForceChange
+                          ? _forceChangeForm()
+                          : _showTwofa
+                              ? _twofaForm()
+                              : _connected
+                                  ? _loginForm()
+                                  : _siteForm(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -291,19 +326,16 @@ class _LoginScreenState extends State<LoginScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.forum_rounded, size: 72, color: Colors.teal),
-        const SizedBox(height: 16),
-        Text(tr('app.name'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 32),
+        Text(tr('login.connect'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Text(tr('login.siteHint'), style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 24),
         TextField(
           controller: _siteCtrl,
           keyboardType: TextInputType.url,
           decoration: InputDecoration(
             labelText: tr('login.site'),
             hintText: tr('login.siteHint'),
-            border: const OutlineInputBorder(),
             errorText: _siteError,
           ),
         ),
@@ -318,7 +350,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 )
               : const Icon(Icons.link),
           label: Text(tr('login.connect')),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(40)),
         ),
         const SizedBox(height: 16),
         Text(tr('login.siteDisclaimer'),
