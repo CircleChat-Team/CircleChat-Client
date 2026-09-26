@@ -46,7 +46,8 @@ class I18n {
     'login.email': '邮箱（可选）',
     'login.back': '返回登录',
     'login.registerSubmit': '提交注册',
-    'login.siteDisclaimer': '输入你自己的 CircleChat 站点地址以连接。\n客户端通过调用该站点的 API 工作，数据由该站点托管。',
+    'login.siteDisclaimer':
+        '输入你自己的 CircleChat 站点地址以连接。\n客户端通过调用该站点的 API 工作，数据由该站点托管。',
     'login.siteInvalid': '站点地址无效',
     'site.invalid': '站点地址无效，请检查是否有误',
     'site.unreachable': '无法连接该站点，请检查地址与网络',
@@ -85,6 +86,21 @@ class I18n {
     'mailbox.notifications': '通知',
     'mailbox.penalties': '处罚',
     'mailbox.empty': '暂无内容',
+    'mailbox.tab.announce': '公告',
+    'mailbox.tab.notify': '通知',
+    'mailbox.tab.penalty': '处罚',
+    'mailbox.notify.readAll': '全部标为已读',
+    'mailbox.notify.unread': '未读',
+    'mailbox.announce.empty': '暂无公告',
+    'mailbox.notify.empty': '暂无通知',
+    'mailbox.penalty.empty': '暂无处罚记录',
+    'mailbox.penalty.active': '生效中',
+    'mailbox.penalty.inactive': '已结束',
+    'mailbox.penalty.permanent': '永久',
+    'mailbox.penalty.until': '有效期至 {0}',
+    'mailbox.penalty.reason': '原因：{0}',
+    'mailbox.penalty.actor': '处理人：{0}',
+    'mailbox.loading': '加载中…',
     // 通用
     'common.ok': '确定',
     'common.cancel': '取消',
@@ -155,7 +171,8 @@ class I18n {
     'site.unreachable': 'Cannot reach the server. Check address and network.',
     'site.network': 'Network error, try again later',
     'reg.fail': 'Registration failed',
-    'reg.pendingHint': 'Registration submitted. It will be active after admin approval.',
+    'reg.pendingHint':
+        'Registration submitted. It will be active after admin approval.',
     'chat.groups': 'Groups',
     'chat.dms': 'Direct messages',
     'chat.friends': 'Friends',
@@ -344,4 +361,5 @@ AppLang currentLang = AppLang.zh;
 I18n get i18n => I18n.of(currentLang);
 
 /// 便捷翻译函数。
-String tr(String key, {List<String> args = const []}) => i18n.tr(key, args: args);
+String tr(String key, {List<String> args = const []}) =>
+    i18n.tr(key, args: args);

@@ -3,6 +3,7 @@
 // 消费 WebSocket 下发的各类事件，并向 UI 提供响应式状态（ChangeNotifier）。
 
 import 'package:flutter/foundation.dart';
+
 import '../core/models.dart';
 import '../core/ws_client.dart';
 import '../core/session.dart';
@@ -41,14 +42,8 @@ class SidebarEntry {
   final Friend? friend;
   final int sort;
 
-  SidebarEntry.group(ChatGroup g, int s)
-      : group = g,
-        friend = null,
-        sort = s;
-  SidebarEntry.friend(Friend f, int s)
-      : group = null,
-        friend = f,
-        sort = s;
+  SidebarEntry.group(ChatGroup g, int s) : group = g, friend = null, sort = s;
+  SidebarEntry.friend(Friend f, int s) : group = null, friend = f, sort = s;
 
   bool get isGroup => group != null;
   String get id => isGroup ? 'g:${group!.id}' : 'd:${friend!.name}';
@@ -78,6 +73,10 @@ class ChatStore extends ChangeNotifier {
   List<Friend> myFriends = [];
   List<FriendRequest> friendRequests = [];
   List<FriendSent> friendSent = [];
+  List<AnnouncementItem> announcements = [];
+  List<InboxNotification> inboxNotifications = [];
+  List<PenaltyItem> myPenalties = [];
+  int get inboxUnread => inboxNotifications.where((item) => !item.read).length;
 
   // 当前会话
   RoomKey active = RoomKey();
@@ -174,11 +173,7 @@ class ChatStore extends ChangeNotifier {
     role = session.role;
     isAdmin = session.isAdmin;
     connect();
-    await Future.wait([
-      loadUsers(),
-      loadFriends(),
-      loadGroups(),
-    ]);
+    await Future.wait([loadUsers(), loadFriends(), loadGroups(), loadInbox()]);
     notifyListeners();
   }
 
@@ -238,6 +233,61 @@ class ChatStore extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> loadInbox() async {
+    try {
+      final results = await Future.wait([
+        session.rest.get('/api/announcements'),
+        session.rest.get('/api/me/notifications'),
+        session.rest.get('/api/me/penalties'),
+      ]);
+      final a = results[0];
+      final n = results[1];
+      final p = results[2];
+      if (a.ok) {
+        announcements = ((a.json['announcements'] as List?) ?? const [])
+            .map(
+              (item) => AnnouncementItem.fromJson(item as Map<String, dynamic>),
+            )
+            .toList();
+      }
+      if (n.ok) {
+        inboxNotifications = ((n.json['notifications'] as List?) ?? const [])
+            .map(
+              (item) =>
+                  InboxNotification.fromJson(item as Map<String, dynamic>),
+            )
+            .toList();
+      }
+      if (p.ok) {
+        myPenalties = ((p.json['penalties'] as List?) ?? const [])
+            .map((item) => PenaltyItem.fromJson(item as Map<String, dynamic>))
+            .toList();
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> markInboxRead() async {
+    if (inboxUnread == 0) return;
+    try {
+      final result = await session.rest.post('/api/me/notifications/read');
+      if (result.ok) {
+        inboxNotifications = inboxNotifications
+            .map(
+              (item) => InboxNotification(
+                id: item.id,
+                title: item.title,
+                body: item.body,
+                created: item.created,
+                read: true,
+              ),
+            )
+            .toList();
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
   // ---------------- 会话切换 ----------------
 
   void switchRoom(String? gid) {
@@ -269,8 +319,10 @@ class ChatStore extends ChangeNotifier {
       return;
     }
     try {
-      final r = await session.rest.get('/api/messages',
-          query: a.gid != null ? {'gid': a.gid!} : {'dm': a.dm!});
+      final r = await session.rest.get(
+        '/api/messages',
+        query: a.gid != null ? {'gid': a.gid!} : {'dm': a.dm!},
+      );
       if (r.ok) {
         // 防止异步返回时用户已切换会话
         if (active.gid != a.gid || active.dm != a.dm) return;
@@ -323,7 +375,9 @@ class ChatStore extends ChangeNotifier {
       case 'presence':
         online
           ..clear()
-          ..addAll((obj['users'] as List?)?.map((e) => e as String) ?? const []);
+          ..addAll(
+            (obj['users'] as List?)?.map((e) => e as String) ?? const [],
+          );
         away
           ..clear()
           ..addAll((obj['away'] as List?)?.map((e) => e as String) ?? const []);
@@ -391,7 +445,10 @@ class ChatStore extends ChangeNotifier {
   String? _roomKeyOf(ChatMessage m) {
     if (m.gid != null) return 'g:${m.gid}';
     if (m.dm != null) {
-      final peers = m.dm!.split(':').where((n) => n.isNotEmpty && n != me).toList();
+      final peers = m.dm!
+          .split(':')
+          .where((n) => n.isNotEmpty && n != me)
+          .toList();
       if (peers.isNotEmpty) return 'd:${peers.first}';
     }
     return null;
@@ -458,7 +515,9 @@ class ChatStore extends ChangeNotifier {
           replyTo: old.replyTo,
           reply: old.reply,
           at: old.at,
-          reactions: (data['reactions'] as List?)?.map((e) => e as Map<String, dynamic>).toList(),
+          reactions: (data['reactions'] as List?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList(),
           recalled: old.recalled,
           recalledBy: old.recalledBy,
         );
@@ -471,7 +530,9 @@ class ChatStore extends ChangeNotifier {
   void _onPenalty(dynamic data) {
     if (data is! Map<String, dynamic>) return;
     muted = (data['muted'] as bool?) ?? false;
-    mutedUntil = data['mutedUntil'] is num ? (data['mutedUntil'] as num).toInt() : null;
+    mutedUntil = data['mutedUntil'] is num
+        ? (data['mutedUntil'] as num).toInt()
+        : null;
     if ((data['banned'] as bool?) == true) {
       // 被封禁：退出登录
       _onLoggedOut();
@@ -498,7 +559,13 @@ class ChatStore extends ChangeNotifier {
       onError?.call('chat.dm.gateToast');
       return;
     }
-    ws.sendText(val, md: md, gid: active.gid, pm: active.dm, replyTo: _replyToIdx);
+    ws.sendText(
+      val,
+      md: md,
+      gid: active.gid,
+      pm: active.dm,
+      replyTo: _replyToIdx,
+    );
   }
 
   int? _replyToIdx;
@@ -547,8 +614,10 @@ class ChatStore extends ChangeNotifier {
   /// 举报一条消息；成功返回 true。
   Future<bool> reportMessage(int idx, String reason) async {
     try {
-      final r = await session.rest
-          .post('/api/report', body: {'idx': idx, 'reason': reason});
+      final r = await session.rest.post(
+        '/api/report',
+        body: {'idx': idx, 'reason': reason},
+      );
       return r.ok;
     } catch (_) {
       return false;
@@ -598,8 +667,10 @@ class ChatStore extends ChangeNotifier {
   /// 发送好友申请；成功返回 true。
   Future<bool> friendRequest(String to) async {
     try {
-      final r = await session.rest
-          .post('/api/friends/request', body: {'to': to});
+      final r = await session.rest.post(
+        '/api/friends/request',
+        body: {'to': to},
+      );
       return r.ok;
     } catch (_) {
       return false;

@@ -37,10 +37,10 @@ class Friend {
   Friend(this.name, this.online, this.image);
 
   factory Friend.fromJson(Map<String, dynamic> j) => Friend(
-        (j['name'] as String?) ?? '',
-        (j['online'] as bool?) ?? false,
-        j['image'] as String?,
-      );
+    (j['name'] as String?) ?? '',
+    (j['online'] as bool?) ?? false,
+    j['image'] as String?,
+  );
 }
 
 /// 收到的好友申请
@@ -50,10 +50,8 @@ class FriendRequest {
 
   FriendRequest(this.from, this.created);
 
-  factory FriendRequest.fromJson(Map<String, dynamic> j) => FriendRequest(
-        (j['from'] as String?) ?? '',
-        j['created'] as int?,
-      );
+  factory FriendRequest.fromJson(Map<String, dynamic> j) =>
+      FriendRequest((j['from'] as String?) ?? '', j['created'] as int?);
 }
 
 /// 已发出的好友申请
@@ -63,10 +61,8 @@ class FriendSent {
 
   FriendSent(this.to, this.created);
 
-  factory FriendSent.fromJson(Map<String, dynamic> j) => FriendSent(
-        (j['to'] as String?) ?? '',
-        j['created'] as int?,
-      );
+  factory FriendSent.fromJson(Map<String, dynamic> j) =>
+      FriendSent((j['to'] as String?) ?? '', j['created'] as int?);
 }
 
 /// 全部账号（侧栏用户列表）
@@ -76,10 +72,8 @@ class ChatUser {
 
   ChatUser(this.name, this.image);
 
-  factory ChatUser.fromJson(Map<String, dynamic> j) => ChatUser(
-        (j['name'] as String?) ?? '',
-        j['image'] as String?,
-      );
+  factory ChatUser.fromJson(Map<String, dynamic> j) =>
+      ChatUser((j['name'] as String?) ?? '', j['image'] as String?);
 }
 
 /// 群
@@ -103,14 +97,14 @@ class ChatGroup {
   });
 
   factory ChatGroup.fromJson(Map<String, dynamic> j) => ChatGroup(
-        id: (j['id'] as String?) ?? '',
-        name: (j['name'] as String?) ?? '',
-        owner: (j['owner'] as String?) ?? '',
-        created: j['created'] as int?,
-        members: j['members'] as int?,
-        avatar: j['avatar'] as String?,
-        announcement: j['announcement'] as String?,
-      );
+    id: (j['id'] as String?) ?? '',
+    name: (j['name'] as String?) ?? '',
+    owner: (j['owner'] as String?) ?? '',
+    created: j['created'] as int?,
+    members: j['members'] as int?,
+    avatar: j['avatar'] as String?,
+    announcement: j['announcement'] as String?,
+  );
 }
 
 /// 群成员
@@ -122,10 +116,10 @@ class GroupMember {
   GroupMember(this.name, this.owner, this.joined);
 
   factory GroupMember.fromJson(Map<String, dynamic> j) => GroupMember(
-        (j['name'] as String?) ?? '',
-        (j['owner'] as bool?) ?? false,
-        j['joined'] as int?,
-      );
+    (j['name'] as String?) ?? '',
+    (j['owner'] as bool?) ?? false,
+    j['joined'] as int?,
+  );
 }
 
 /// 入群申请
@@ -135,10 +129,8 @@ class JoinRequest {
 
   JoinRequest(this.name, this.created);
 
-  factory JoinRequest.fromJson(Map<String, dynamic> j) => JoinRequest(
-        (j['name'] as String?) ?? '',
-        j['created'] as int?,
-      );
+  factory JoinRequest.fromJson(Map<String, dynamic> j) =>
+      JoinRequest((j['name'] as String?) ?? '', j['created'] as int?);
 }
 
 /// 群内图片/文件
@@ -153,13 +145,13 @@ class GroupFile {
   GroupFile(this.idx, this.type, this.name, this.size, this.ts, this.content);
 
   factory GroupFile.fromJson(Map<String, dynamic> j) => GroupFile(
-        (j['idx'] as int?) ?? 0,
-        (j['type'] as String?) ?? 'file',
-        j['name'] as String?,
-        j['size'] as int?,
-        j['ts'] as int?,
-        j['content'] as String?,
-      );
+    (j['idx'] as int?) ?? 0,
+    (j['type'] as String?) ?? 'file',
+    j['name'] as String?,
+    j['size'] as int?,
+    j['ts'] as int?,
+    j['content'] as String?,
+  );
 }
 
 /// 群管理详情
@@ -170,21 +162,27 @@ class GroupDetail {
   final List<GroupMember> members;
   final List<GroupFile> files;
 
-  GroupDetail(this.group, this.isOwner, this.requests, this.members, this.files);
+  GroupDetail(
+    this.group,
+    this.isOwner,
+    this.requests,
+    this.members,
+    this.files,
+  );
 
   factory GroupDetail.fromJson(Map<String, dynamic> j) => GroupDetail(
-        ChatGroup.fromJson((j['group'] as Map<String, dynamic>?) ?? const {}),
-        (j['isOwner'] as bool?) ?? false,
-        ((j['requests'] as List?) ?? const [])
-            .map((e) => JoinRequest.fromJson((e as Map<String, dynamic>)))
-            .toList(),
-        ((j['members'] as List?) ?? const [])
-            .map((e) => GroupMember.fromJson((e as Map<String, dynamic>)))
-            .toList(),
-        ((j['files'] as List?) ?? const [])
-            .map((e) => GroupFile.fromJson((e as Map<String, dynamic>)))
-            .toList(),
-      );
+    ChatGroup.fromJson((j['group'] as Map<String, dynamic>?) ?? const {}),
+    (j['isOwner'] as bool?) ?? false,
+    ((j['requests'] as List?) ?? const [])
+        .map((e) => JoinRequest.fromJson((e as Map<String, dynamic>)))
+        .toList(),
+    ((j['members'] as List?) ?? const [])
+        .map((e) => GroupMember.fromJson((e as Map<String, dynamic>)))
+        .toList(),
+    ((j['files'] as List?) ?? const [])
+        .map((e) => GroupFile.fromJson((e as Map<String, dynamic>)))
+        .toList(),
+  );
 }
 
 /// 合并转发单条记录
@@ -198,20 +196,20 @@ class MergeItem {
   MergeItem(this.from, this.type, this.content, this.name, this.size);
 
   factory MergeItem.fromJson(Map<String, dynamic> j) => MergeItem(
-        (j['from'] as String?) ?? '',
-        (j['type'] as String?) ?? 'text',
-        j['content'] as String?,
-        j['name'] as String?,
-        j['size'] as int?,
-      );
+    (j['from'] as String?) ?? '',
+    (j['type'] as String?) ?? 'text',
+    j['content'] as String?,
+    j['name'] as String?,
+    j['size'] as int?,
+  );
 
   Map<String, dynamic> toJson() => {
-        'from': from,
-        'type': type,
-        'content': content,
-        'name': name,
-        'size': size,
-      };
+    'from': from,
+    'type': type,
+    'content': content,
+    'name': name,
+    'size': size,
+  };
 }
 
 /// 合并转发数据（type='merge' 消息的 content 为 JSON 字符串）
@@ -222,11 +220,11 @@ class MergeData {
   MergeData(this.title, this.items);
 
   factory MergeData.fromJson(Map<String, dynamic> j) => MergeData(
-        j['title'] as String?,
-        ((j['items'] as List?) ?? const [])
-            .map((e) => MergeItem.fromJson((e as Map<String, dynamic>)))
-            .toList(),
-      );
+    j['title'] as String?,
+    ((j['items'] as List?) ?? const [])
+        .map((e) => MergeItem.fromJson((e as Map<String, dynamic>)))
+        .toList(),
+  );
 }
 
 /// 聊天消息
@@ -270,24 +268,26 @@ class ChatMessage {
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
-        idx: j['idx'] as int?,
-        type: (j['type'] as String?) ?? 'text',
-        from: (j['from'] as String?) ?? '',
-        gid: j['gid'] as String?,
-        dm: j['dm'] as String?,
-        content: (j['content'] as String?) ?? '',
-        name: j['name'] as String?,
-        size: j['size'] as int?,
-        ts: j['ts'] as int?,
-        time: j['time'] as int?,
-        replyTo: j['replyTo'] as int?,
-        reply: j['reply'] as Map<String, dynamic>?,
-        at: (j['at'] as List?)?.map((e) => e as String).toList(),
-        reactions: (j['reactions'] as List?)?.map((e) => e as Map<String, dynamic>).toList(),
-        recalled: j['recalled'] as int?,
-        recalledBy: j['recalled_by'] as String?,
-        fileExpired: (j['file_expired'] as bool?) ?? false,
-      );
+    idx: j['idx'] as int?,
+    type: (j['type'] as String?) ?? 'text',
+    from: (j['from'] as String?) ?? '',
+    gid: j['gid'] as String?,
+    dm: j['dm'] as String?,
+    content: (j['content'] as String?) ?? '',
+    name: j['name'] as String?,
+    size: j['size'] as int?,
+    ts: j['ts'] as int?,
+    time: j['time'] as int?,
+    replyTo: j['replyTo'] as int?,
+    reply: j['reply'] as Map<String, dynamic>?,
+    at: (j['at'] as List?)?.map((e) => e as String).toList(),
+    reactions: (j['reactions'] as List?)
+        ?.map((e) => e as Map<String, dynamic>)
+        .toList(),
+    recalled: j['recalled'] as int?,
+    recalledBy: j['recalled_by'] as String?,
+    fileExpired: (j['file_expired'] as bool?) ?? false,
+  );
 
   /// 时间戳取值：优先 ts，回退 time，再无则为 0
   int get tsValue => ts ?? time ?? 0;
@@ -302,16 +302,23 @@ class ProfileData {
   final bool online;
   final int? msgs;
 
-  ProfileData(this.name, this.role, this.created, this.image, this.online, this.msgs);
+  ProfileData(
+    this.name,
+    this.role,
+    this.created,
+    this.image,
+    this.online,
+    this.msgs,
+  );
 
   factory ProfileData.fromJson(Map<String, dynamic> j) => ProfileData(
-        (j['name'] as String?) ?? '',
-        (j['role'] as String?) ?? 'user',
-        j['created'] as int?,
-        j['image'] as String?,
-        (j['online'] as bool?) ?? false,
-        j['msgs'] as int?,
-      );
+    (j['name'] as String?) ?? '',
+    (j['role'] as String?) ?? 'user',
+    j['created'] as int?,
+    j['image'] as String?,
+    (j['online'] as bool?) ?? false,
+    j['msgs'] as int?,
+  );
 }
 
 /// 处罚记录
@@ -347,19 +354,69 @@ class PenaltyItem {
   });
 
   factory PenaltyItem.fromJson(Map<String, dynamic> j) => PenaltyItem(
-        id: (j['id'] as int?) ?? 0,
-        type: (j['type'] as String?) ?? '',
-        target: (j['target'] as String?) ?? '',
-        reason: j['reason'] as String?,
-        actor: j['actor'] as String?,
-        created: j['created'] as int?,
-        expires: j['expires'] as int?,
-        durationMs: j['duration_ms'] as int?,
-        active: (j['active'] as bool?) ?? false,
-        permanent: (j['permanent'] as bool?) ?? false,
-        revoked: (j['revoked'] as bool?) ?? false,
-        revokedBy: j['revoked_by'] as String?,
-        revokedAt: j['revoked_at'] as int?,
+    id: (j['id'] as int?) ?? 0,
+    type: (j['type'] as String?) ?? '',
+    target: (j['target'] as String?) ?? '',
+    reason: j['reason'] as String?,
+    actor: j['actor'] as String?,
+    created: j['created'] as int?,
+    expires: j['expires'] as int?,
+    durationMs: j['duration_ms'] as int?,
+    active: (j['active'] as bool?) ?? false,
+    permanent: (j['permanent'] as bool?) ?? false,
+    revoked: (j['revoked'] as bool?) ?? false,
+    revokedBy: j['revoked_by'] as String?,
+    revokedAt: j['revoked_at'] as int?,
+  );
+}
+
+class AnnouncementItem {
+  final int id;
+  final String title;
+  final String? content;
+  final String? actor;
+  final int? created;
+
+  AnnouncementItem({
+    required this.id,
+    required this.title,
+    this.content,
+    this.actor,
+    this.created,
+  });
+
+  factory AnnouncementItem.fromJson(Map<String, dynamic> json) =>
+      AnnouncementItem(
+        id: (json['id'] as int?) ?? 0,
+        title: (json['title'] as String?) ?? '',
+        content: json['content'] as String?,
+        actor: json['actor'] as String?,
+        created: json['created'] as int?,
+      );
+}
+
+class InboxNotification {
+  final int id;
+  final String? title;
+  final String? body;
+  final int? created;
+  final bool read;
+
+  InboxNotification({
+    required this.id,
+    this.title,
+    this.body,
+    this.created,
+    this.read = false,
+  });
+
+  factory InboxNotification.fromJson(Map<String, dynamic> json) =>
+      InboxNotification(
+        id: (json['id'] as int?) ?? 0,
+        title: json['title'] as String?,
+        body: json['body'] as String?,
+        created: json['created'] as int?,
+        read: (json['read'] as bool?) ?? false,
       );
 }
 
@@ -390,17 +447,17 @@ class ReportItem {
   });
 
   factory ReportItem.fromJson(Map<String, dynamic> j) => ReportItem(
-        id: (j['id'] as int?) ?? 0,
-        msgIdx: (j['msg_idx'] as int?) ?? 0,
-        msgFrom: j['msg_from'] as String?,
-        msgType: j['msg_type'] as String?,
-        msgSnippet: j['msg_snippet'] as String?,
-        reason: j['reason'] as String?,
-        reporter: j['reporter'] as String?,
-        reportedIp: j['reported_ip'] as String?,
-        created: j['created'] as int?,
-        status: j['status'] as String?,
-      );
+    id: (j['id'] as int?) ?? 0,
+    msgIdx: (j['msg_idx'] as int?) ?? 0,
+    msgFrom: j['msg_from'] as String?,
+    msgType: j['msg_type'] as String?,
+    msgSnippet: j['msg_snippet'] as String?,
+    reason: j['reason'] as String?,
+    reporter: j['reporter'] as String?,
+    reportedIp: j['reported_ip'] as String?,
+    created: j['created'] as int?,
+    status: j['status'] as String?,
+  );
 }
 
 /// 审计日志条目
@@ -413,17 +470,25 @@ class LogItem {
   final String? detail;
   final String? ip;
 
-  LogItem(this.id, this.ts, this.actor, this.action, this.target, this.detail, this.ip);
+  LogItem(
+    this.id,
+    this.ts,
+    this.actor,
+    this.action,
+    this.target,
+    this.detail,
+    this.ip,
+  );
 
   factory LogItem.fromJson(Map<String, dynamic> j) => LogItem(
-        j['id'] as int?,
-        (j['ts'] as int?) ?? 0,
-        j['actor'] as String?,
-        (j['action'] as String?) ?? '',
-        j['target'] as String?,
-        j['detail'] as String?,
-        j['ip'] as String?,
-      );
+    j['id'] as int?,
+    (j['ts'] as int?) ?? 0,
+    j['actor'] as String?,
+    (j['action'] as String?) ?? '',
+    j['target'] as String?,
+    j['detail'] as String?,
+    j['ip'] as String?,
+  );
 }
 
 /// 群内文件管理粒度的文件记录（/api/groups/file 相关）
@@ -435,14 +500,21 @@ class GroupEntryFile {
   final int? ts;
   final String? content;
 
-  GroupEntryFile(this.idx, this.type, this.name, this.size, this.ts, this.content);
+  GroupEntryFile(
+    this.idx,
+    this.type,
+    this.name,
+    this.size,
+    this.ts,
+    this.content,
+  );
 
   factory GroupEntryFile.fromJson(Map<String, dynamic> j) => GroupEntryFile(
-        (j['idx'] as int?) ?? 0,
-        (j['type'] as String?) ?? 'file',
-        j['name'] as String?,
-        j['size'] as int?,
-        j['ts'] as int?,
-        j['content'] as String?,
-      );
+    (j['idx'] as int?) ?? 0,
+    (j['type'] as String?) ?? 'file',
+    j['name'] as String?,
+    j['size'] as int?,
+    j['ts'] as int?,
+    j['content'] as String?,
+  );
 }

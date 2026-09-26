@@ -10,6 +10,7 @@ import '../../core/ws_client.dart';
 import 'sidebar.dart';
 import 'message_list.dart';
 import 'input_bar.dart';
+import 'mailbox_panel.dart';
 import '../toast.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -169,6 +170,34 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
             backgroundColor: scheme.surface,
+            actions: [
+              IconButton(
+                tooltip: tr('mailbox.title'),
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => MailboxPanel(store: store),
+                ),
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.notifications_outlined),
+                    if (store.inboxUnread > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 9,
+                          height: 9,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
           Expanded(child: MessageList(store: store)),
           if (store.hasRoom) InputBar(store: store),
