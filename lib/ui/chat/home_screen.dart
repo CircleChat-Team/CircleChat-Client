@@ -56,17 +56,30 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, c) {
           final wide = c.maxWidth >= 760;
           if (wide) {
-            return Row(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  width: _navCollapsed ? 56 : 280,
-                  child: Sidebar(store: store, collapsed: _navCollapsed),
-                ),
-                const VerticalDivider(width: 1, thickness: 1),
-                Expanded(child: _chat()),
-              ],
+            // Win11 布局：侧栏与聊天区为独立圆角卡片，浮在亚克力背景上
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      width: _navCollapsed ? 56 : 280,
+                      child: Sidebar(store: store, collapsed: _navCollapsed),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: _chat(),
+                    ),
+                  ),
+                ],
+              ),
             );
           }
           // 窄屏：侧栏 / 聊天 二选一
@@ -91,8 +104,9 @@ class _HomeScreenState extends State<HomeScreen> {
     };
     final connColor = conn == ConnState.on ? Colors.green : Colors.grey;
 
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return ColoredBox(
-      color: Theme.of(context).scaffoldBackgroundColor,
+      color: dark ? const Color(0xFF2B2B2B) : const Color(0xFFFFFFFF),
       child: Column(
       children: [
         AppBar(

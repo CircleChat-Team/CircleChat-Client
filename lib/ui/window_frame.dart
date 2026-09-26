@@ -66,7 +66,7 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
         child: ClipRRect(
           borderRadius: radius,
           child: ColoredBox(
-            color: dark ? const Color(0xFF202020) : const Color(0xFFF3F3F3),
+            color: dark ? const Color(0xFF202020) : const Color(0xFFFFFFFF),
             child: Column(
               children: [
                 TitleBar(dark: dark, maximized: _maximized),

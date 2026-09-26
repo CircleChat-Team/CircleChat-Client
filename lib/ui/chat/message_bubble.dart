@@ -82,7 +82,7 @@ class MessageBubble extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           border: Border.all(color: mine ? const Color(0xFFC7E0F4) : const Color(0xFFE5E5E5)),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

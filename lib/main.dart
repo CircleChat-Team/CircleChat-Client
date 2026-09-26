@@ -26,7 +26,6 @@ Future<void> main() async {
     );
     await windowManager.waitUntilReadyToShow(opts, () async {
       // 无边框窗口：隐藏系统标题栏，由 WindowFrame 绘制自定义 32px 标题栏与窗口按钮。
-      // 不使用透明背景（Flutter Windows 透明窗口渲染不可靠，会导致内容不绘制）。
       await windowManager.setTitleBarStyle(
         TitleBarStyle.hidden,
         windowButtonVisibility: false,
@@ -114,7 +113,7 @@ class _CircleChatAppState extends State<CircleChatApp> {
         ),
         useMaterial3: true,
         fontFamily: 'Segoe UI',
-        scaffoldBackgroundColor: const Color(0xFFF3F3F3),
+        scaffoldBackgroundColor: const Color(0xFFFFFFFF),
         visualDensity: VisualDensity.standard,
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
