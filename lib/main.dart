@@ -21,13 +21,12 @@ Future<void> main() async {
       size: Size(1200, 800),
       minimumSize: Size(480, 360),
       center: true,
-      backgroundColor: Colors.transparent,
       titleBarStyle: TitleBarStyle.hidden,
       windowButtonVisibility: false,
     );
     await windowManager.waitUntilReadyToShow(opts, () async {
-      // 透明背景 + 隐藏系统标题栏，由 WindowFrame 绘制 8px 圆角窗口
-      await windowManager.setBackgroundColor(const Color(0x00000000));
+      // 无边框窗口：隐藏系统标题栏，由 WindowFrame 绘制自定义 32px 标题栏与窗口按钮。
+      // 不使用透明背景（Flutter Windows 透明窗口渲染不可靠，会导致内容不绘制）。
       await windowManager.setTitleBarStyle(
         TitleBarStyle.hidden,
         windowButtonVisibility: false,

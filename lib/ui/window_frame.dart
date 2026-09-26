@@ -1,6 +1,5 @@
 // CircleChat 原生客户端 — Windows 11 窗口框架
 // 无边框窗口：顶部 32px 自定义标题栏（拖动区域 + 最小化/最大化/关闭），
-// 非最大化时窗口内容 8px 圆角（背景透明露出圆角），最大化时铺满无圆角；
 // 背景色模拟 Mica（浅 #F3F3F3 / 深 #202020），跟随系统主题。
 
 import 'dart:io' show Platform;
@@ -58,22 +57,31 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     final dark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
     final radius =
         _maximized ? BorderRadius.zero : BorderRadius.circular(8);
-    return ClipRRect(
-      borderRadius: radius,
-      child: ColoredBox(
-        color: dark ? const Color(0xFF202020) : const Color(0xFFF3F3F3),
-        child: Column(
-          children: [
-            TitleBar(dark: dark, maximized: _maximized),
-            Expanded(child: widget.child),
-          ],
+    // WindowFrame 位于 MaterialApp 外层，需自行提供 Directionality/基础 Material，
+    // 否则标题栏中的 Text 会因缺少 Directionality 抛异常。
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Material(
+        type: MaterialType.transparency,
+        child: ClipRRect(
+          borderRadius: radius,
+          child: ColoredBox(
+            color: dark ? const Color(0xFF202020) : const Color(0xFFF3F3F3),
+            child: Column(
+              children: [
+                TitleBar(dark: dark, maximized: _maximized),
+                Expanded(child: widget.child),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-/// 32px 自定义标题栏：左侧标题（可双击最大化），右侧窗口控制按钮。
+/// 32px 自定义标题栏：左侧标题（可拖动/双击最大化），右侧窗口控制按钮。
+/// 遵循 Win11 规范：标题距左 16px，按钮 46px 宽、图标 10px、full-bleed 背板。
 class TitleBar extends StatelessWidget {
   final bool dark;
   final bool maximized;
@@ -95,7 +103,7 @@ class TitleBar extends StatelessWidget {
                   height: 32,
                   child: Row(
                     children: [
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 16),
                       Text(
                         'CircleChat',
                         style: TextStyle(
@@ -126,7 +134,7 @@ class TitleBar extends StatelessWidget {
           ),
           _WinButton(
             icon: Icons.close,
-            iconColor: dark ? Colors.black : Colors.white,
+            iconColor: fg,
             dark: dark,
             isClose: true,
             onPressed: () => windowManager.close(),
@@ -187,6 +195,10 @@ class _WinButtonState extends State<_WinButton> {
               ? base.withValues(alpha: 0.06)
               : Colors.transparent;
     }
+    // 关闭按钮悬停/按下时红底白字；其余时刻跟随主题前景色
+    final iconColor = (widget.isClose && (_hover || _pressed))
+        ? Colors.white
+        : widget.iconColor;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() {
@@ -205,7 +217,7 @@ class _WinButtonState extends State<_WinButton> {
           height: 32,
           color: bg,
           alignment: Alignment.center,
-          child: Icon(widget.icon, size: 12, color: widget.iconColor),
+          child: Icon(widget.icon, size: 10, color: iconColor),
         ),
       ),
     );
